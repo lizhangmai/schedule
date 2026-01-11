@@ -5,7 +5,7 @@
 ## 问题背景
 
 异构 GPU 调度是一个经典的 NP-Hard 问题，需要同时考虑：
-- **计算能力差异**：不同 GPU 的计算速度不同
+- **计算能力差异**：不同 GPU 的计算速度不同（基于真实 GPU 规格）
 - **显存约束**：任务对显存的需求不同，并发受显存容量限制
 - **截止时间和优先级**：任务有不同的重要性和时间约束
 
@@ -15,7 +15,8 @@
 - 事件驱动的仿真引擎
 - 完整的性能评估指标
 - 可视化结果对比
-- 可扩展的 GPU 集群配置
+- 可配置的 GPU 集群（从 `config/gpu_configs.py` 读取）
+- 支持多种负载级别数据集生成
 
 ## 安装
 
@@ -63,11 +64,18 @@ print(f"GPU Average Memory Utilization: {metrics.gpu_average_memory_utilization:
 
 ## GPU 配置
 
-| 型号 | 显存 | Scaling Factor |
-|------|------|----------------|
-| A100 | 80 GB | 2.0 |
-| A30  | 24 GB | 1.0 |
-| L40  | 48 GB | 1.5 |
+配置文件：`config/gpu_configs.py`
+
+| 型号 | 显存 | Scaling Factor | 说明 |
+|------|------|----------------|------|
+| A100 | 80 GB | 57.0 | 基于 19.5 TFLOPS FP32 |
+| A30  | 24 GB | 30.0 | 基准 GPU (10.3 TFLOPS FP32) |
+| L40  | 48 GB | 55.5 | 基于 19.1 TFLOPS FP32 |
+
+**Scaling Factor 设计原则**：
+- 基于 NVIDIA 官方 FP32 性能规格设置算力比值
+- 单个 GPU 无法独立完成所有任务，必须多 GPU 协作
+- 99.9% 的单个任务可在 deadline 内完成
 
 ## 调度算法
 
@@ -97,10 +105,12 @@ Score = α·Urgency + β·Efficiency + γ·MemoryFit + δ·Utilization
 ## 运行实验
 
 ```bash
-# 生成任务数据集
-python generate_tasks.py --task-id 3              # 生成 tasks3.csv
-python generate_tasks.py --task-ids 3,4,5         # 生成多个数据集
-python generate_tasks.py --all                    # 生成所有缺失的数据集
+# 生成任务数据集（支持不同负载级别）
+python generate_tasks.py --task-id 3                      # 中等负载（默认）
+python generate_tasks.py --task-id 4 --load-level high    # 高负载
+python generate_tasks.py --task-id 5 --load-level extreme # 极高负载
+python generate_tasks.py --task-ids 3,4,5                 # 生成多个
+python generate_tasks.py --all --load-level high          # 生成所有缺失数据集
 
 # 运行单个实验
 python experiments/run_comparison.py --dataset data/tasks1.csv --cluster small
@@ -112,22 +122,49 @@ python experiments/run_comparison.py --full
 python experiments/run_comparison.py --dataset data/tasks1.csv --algorithms FIFO MultiObjective
 ```
 
+### 负载级别说明
+
+| 级别 | 任务数 | Workload | 到达时间范围 | Deadline因子 | 适用场景 |
+|------|--------|----------|--------------|--------------|----------|
+| low | 500 | 50-400 | 0-5000 | 3.0-5.0x | 轻松完成，测试基本功能 |
+| medium | 1000 | 50-800 | 0-2500 | 1.5-3.0x | 默认测试场景 |
+| high | 1500 | 100-800 | 0-1500 | 0.8-1.5x | 需要多 GPU 协作 |
+| extreme | 2000 | 200-800 | 0-1000 | 0.5-1.0x | 压力测试，必须多 GPU 并行 |
+
 ## 评估指标
+
+### Algorithm Comparison 图表（6个子图）
+
+| 位置 | 指标 | 说明 |
+|------|------|------|
+| 左上 | Weighted Completion Time | 加权完成时间 Σ(weight × completion_time) |
+| 中上 | Average Completion Time | 平均完成时间 |
+| 右上 | Deadline Miss Count | 错过 deadline 的任务数 |
+| 左下 | Deadline Miss Rate | Deadline 错过率 |
+| 中下 | Weighted Tardiness | 加权拖期 Σ(weight × max(0, completion - deadline)) |
+| 右下 | Makespan | 最大完成时间（总调度时长） |
+
+### GPU Utilization 图表
 
 | 指标 | 说明 |
 |------|------|
-| 加权完成时间 | Σ(weight × completion_time) |
-| 平均完成时间 | Σ(completion_time) / n |
-| Deadline miss 数量 | completion_time > deadline 的任务数 |
-| Deadline miss 率 | deadline miss 数量 / 总任务数 |
-| 加权拖期 | Σ(weight × max(0, completion_time - deadline)) |
-| Makespan | 最大完成时间 |
-| GPU 时间利用率 | GPU 忙碌时间 / 总时间（合并重叠时间段，范围 0-1） |
-| 平均并发任务数 | 平均同时运行的任务数（可 > 1，表示 GPU 同时处理多个任务） |
-| GPU 峰值显存利用率 | 仿真过程中峰值时刻的显存使用率（范围 0-1） |
-| GPU 平均显存利用率 | 时间加权的平均显存使用率（范围 0-1） |
+| Time Utilization | GPU 时间利用率（忙碌时间/总时间，合并重叠段） |
+| Average Memory Utilization | 时间加权的平均显存使用率 |
 
-**注**：加权完成时间、平均完成时间、deadline miss 相关指标在不同算法间可能相同，这是因为所有算法调度了相同的任务集，差异主要体现在 makespan 和资源利用率上。
+### 完整指标列表
+
+| 指标 | 说明 | 范围 |
+|------|------|------|
+| 加权完成时间 | Σ(weight × completion_time) | - |
+| 平均完成时间 | Σ(completion_time) / n | - |
+| Deadline miss 数量 | completion_time > deadline 的任务数 | - |
+| Deadline miss 率 | deadline miss 数量 / 总任务数 | 0-1 |
+| 加权拖期 | Σ(weight × max(0, completion_time - deadline)) | - |
+| Makespan | 最大完成时间 | - |
+| GPU 时间利用率 | GPU 忙碌时间 / 总时间（合并重叠） | 0-1 |
+| 平均并发任务数 | 平均同时运行的任务数（可 > 1） | ≥0 |
+| 峰值显存利用率 | 仿真过程中峰值时刻的显存使用率 | 0-1 |
+| 平均显存利用率 | 时间加权的平均显存使用率 | 0-1 |
 
 ## 项目结构
 
@@ -141,21 +178,33 @@ schedule/
 │   ├── algorithms/
 │   │   ├── base.py                # 调度器基类
 │   │   ├── baseline/              # 基线算法
+│   │   │   ├── fifo_scheduler.py
+│   │   │   ├── spt_scheduler.py
+│   │   │   └── edf_scheduler.py
 │   │   └── heuristic/             # 启发式算法
+│   │       └── multi_objective_scheduler.py
 │   ├── simulation/                # 仿真引擎
+│   │   └── simulator.py
 │   ├── metrics/                   # 评估指标
+│   │   └── calculator.py
 │   ├── utils/                     # 工具函数
+│   │   └── data_loader.py
 │   └── visualization/             # 可视化
+│       └── plots.py
 ├── config/                        # 配置文件
+│   └── gpu_configs.py             # GPU 配置
 ├── data/                          # 数据集目录
-│   ├── tasks1.csv                 # 数据集 1
-│   ├── tasks2.csv                 # 数据集 2
+│   ├── tasks1.csv                 # 中等负载
+│   ├── tasks2.csv                 # 中等负载
+│   ├── tasks3.csv                 # 高负载
+│   ├── tasks4.csv                 # 极高负载
 │   └── ...                        # 更多数据集
 ├── experiments/                   # 实验脚本
+│   └── run_comparison.py          # 算法对比实验
 ├── results/                       # 结果输出
-│   ├── metrics/                   # 指标数据
+│   ├── metrics/                   # CSV 和 JSON 指标数据
 │   └── figures/                   # 可视化图表
-├── generate_tasks.py              # 数据集生成脚本
+├── generate_tasks.py              # 数据集生成脚本（支持负载级别）
 └── requirements.txt
 ```
 
@@ -170,7 +219,7 @@ schedule/
 ## 参考文献
 
 详细的问题形式化和复杂性分析请参考：
-- `heterogeneous_gpu_scheduling_analysis.md`
+- `task.md`
 
 ## 许可
 
