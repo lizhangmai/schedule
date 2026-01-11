@@ -121,8 +121,12 @@ python experiments/run_comparison.py --dataset data/tasks1.csv --algorithms FIFO
 | Deadline miss 率 | deadline miss 数量 / 总任务数 |
 | 加权拖期 | Σ(weight × max(0, completion_time - deadline)) |
 | Makespan | 最大完成时间 |
-| GPU 计算利用率 | 实际计算时间 / 总时间 |
-| GPU 显存利用率 | 峰值显存使用 / 显存容量 |
+| GPU 时间利用率 | GPU 忙碌时间 / 总时间（合并重叠时间段，范围 0-1） |
+| 平均并发任务数 | 平均同时运行的任务数（可 > 1，表示 GPU 同时处理多个任务） |
+| GPU 峰值显存利用率 | 仿真过程中峰值时刻的显存使用率（范围 0-1） |
+| GPU 平均显存利用率 | 时间加权的平均显存使用率（范围 0-1） |
+
+**注**：加权完成时间、平均完成时间、deadline miss 相关指标在不同算法间可能相同，这是因为所有算法调度了相同的任务集，差异主要体现在 makespan 和资源利用率上。
 
 ## 项目结构
 

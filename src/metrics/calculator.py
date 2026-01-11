@@ -24,7 +24,10 @@ class Metrics:
         deadline_miss_rate: Deadline miss 率
         weighted_tardiness: 加权拖期总和
         makespan: 最大完成时间
-        gpu_utilization: GPU 利用率
+        gpu_time_utilization: GPU 时间利用率 (0-1)
+        gpu_average_concurrent_tasks: 平均并发任务数 (可>1)
+        gpu_peak_memory_utilization: 峰值显存利用率 (0-1)
+        gpu_average_memory_utilization: 平均显存利用率 (0-1)
     """
     weighted_completion_time: float
     average_completion_time: float
@@ -32,8 +35,10 @@ class Metrics:
     deadline_miss_rate: float
     weighted_tardiness: float
     makespan: float
-    gpu_compute_utilization: float
-    gpu_memory_utilization: float
+    gpu_time_utilization: float
+    gpu_average_concurrent_tasks: float
+    gpu_peak_memory_utilization: float
+    gpu_average_memory_utilization: float
 
     def to_dict(self) -> Dict[str, float]:
         """转换为字典"""
@@ -44,8 +49,10 @@ class Metrics:
             "deadline_miss_rate": self.deadline_miss_rate,
             "weighted_tardiness": self.weighted_tardiness,
             "makespan": self.makespan,
-            "gpu_compute_utilization": self.gpu_compute_utilization,
-            "gpu_memory_utilization": self.gpu_memory_utilization,
+            "gpu_time_utilization": self.gpu_time_utilization,
+            "gpu_average_concurrent_tasks": self.gpu_average_concurrent_tasks,
+            "gpu_peak_memory_utilization": self.gpu_peak_memory_utilization,
+            "gpu_average_memory_utilization": self.gpu_average_memory_utilization,
         }
 
 
@@ -79,8 +86,10 @@ class MetricsCalculator:
                 deadline_miss_rate=0.0,
                 weighted_tardiness=0.0,
                 makespan=0.0,
-                gpu_compute_utilization=0.0,
-                gpu_memory_utilization=0.0,
+                gpu_time_utilization=0.0,
+                gpu_average_concurrent_tasks=0.0,
+                gpu_peak_memory_utilization=0.0,
+                gpu_average_memory_utilization=0.0,
             )
 
         # 1. 加权完成时间
@@ -99,10 +108,8 @@ class MetricsCalculator:
         # 5. Makespan
         makespan = MetricsCalculator.makespan(scheduled_tasks) if result is None else result.makespan
 
-        # 6. GPU 利用率
+        # 6. GPU 利用率指标
         gpu_stats = MetricsCalculator.gpu_utilization(cluster, makespan)
-        gpu_compute_utilization = gpu_stats["compute_utilization"]
-        gpu_memory_utilization = gpu_stats["memory_utilization"]
 
         return Metrics(
             weighted_completion_time=weighted_completion_time,
@@ -111,8 +118,10 @@ class MetricsCalculator:
             deadline_miss_rate=deadline_miss_rate,
             weighted_tardiness=weighted_tardiness,
             makespan=makespan,
-            gpu_compute_utilization=gpu_compute_utilization,
-            gpu_memory_utilization=gpu_memory_utilization,
+            gpu_time_utilization=gpu_stats["time_utilization"],
+            gpu_average_concurrent_tasks=gpu_stats["average_concurrent_tasks"],
+            gpu_peak_memory_utilization=gpu_stats["peak_memory_utilization"],
+            gpu_average_memory_utilization=gpu_stats["average_memory_utilization"],
         )
 
     @staticmethod
@@ -181,24 +190,32 @@ class MetricsCalculator:
             total_time: 总仿真时间
 
         Returns:
-            包含 compute_utilization 和 memory_utilization 的字典
+            包含所有 GPU 利用率指标的字典
         """
         if total_time == 0 or not cluster.gpus:
-            return {"compute_utilization": 0.0, "memory_utilization": 0.0}
+            return {
+                "time_utilization": 0.0,
+                "average_concurrent_tasks": 0.0,
+                "peak_memory_utilization": 0.0,
+                "average_memory_utilization": 0.0,
+            }
 
-        total_compute_util = 0.0
-        total_memory_util = 0.0
+        total_time_util = 0.0
+        total_concurrent_tasks = 0.0
+        total_peak_memory_util = 0.0
+        total_avg_memory_util = 0.0
 
         for gpu in cluster.gpus:
-            total_compute_util += gpu.get_compute_utilization(total_time)
-            total_memory_util += gpu.get_peak_memory_utilization()
-
-        compute_utilization = total_compute_util / len(cluster.gpus)
-        memory_utilization = total_memory_util / len(cluster.gpus)
+            total_time_util += gpu.get_compute_utilization(total_time)
+            total_concurrent_tasks += gpu.get_average_concurrent_tasks(total_time)
+            total_peak_memory_util += gpu.get_peak_memory_utilization()
+            total_avg_memory_util += gpu.get_average_memory_utilization(total_time)
 
         return {
-            "compute_utilization": compute_utilization,
-            "memory_utilization": memory_utilization,
+            "time_utilization": total_time_util / len(cluster.gpus),
+            "average_concurrent_tasks": total_concurrent_tasks / len(cluster.gpus),
+            "peak_memory_utilization": total_peak_memory_util / len(cluster.gpus),
+            "average_memory_utilization": total_avg_memory_util / len(cluster.gpus),
         }
 
 

@@ -162,19 +162,75 @@ class GPU:
 
     def get_compute_utilization(self, total_time: float) -> float:
         """
-        计算计算资源利用率
+        计算计算资源时间利用率（GPU 忙碌时间 / 总时间）
+
+        合并重叠的时间段，计算实际占用的时间。
 
         Args:
             total_time: 总仿真时间
 
         Returns:
-            利用率 (0-1)
+            时间利用率 (0-1)
         """
-        if total_time == 0:
+        if total_time == 0 or not self.timeline:
             return 0.0
 
-        busy_time = sum(end - start for start, end, _ in self.timeline)
+        # 收集所有时间点并标记为开始或结束
+        events = []
+        for start, end, _ in self.timeline:
+            events.append((start, 1))   # 开始事件
+            events.append((end, -1))    # 结束事件
+
+        # 按时间排序
+        events.sort(key=lambda x: x[0])
+
+        # 计算实际忙碌时间（合并重叠时间段）
+        busy_time = 0.0
+        concurrent = 0
+        prev_time = None
+
+        for time, delta in events:
+            if prev_time is not None and concurrent > 0:
+                busy_time += time - prev_time
+            concurrent += delta
+            prev_time = time
+
         return busy_time / total_time
+
+    def get_average_concurrent_tasks(self, total_time: float) -> float:
+        """
+        计算平均并发任务数（表示 GPU 同时执行多个任务的程度）
+
+        Args:
+            total_time: 总仿真时间
+
+        Returns:
+            平均并发任务数（可以 > 1）
+        """
+        if total_time == 0 or not self.timeline:
+            return 0.0
+
+        # 收集所有时间点
+        events = []
+        for start, end, _ in self.timeline:
+            events.append((start, 1))   # 开始事件
+            events.append((end, -1))    # 结束事件
+
+        events.sort(key=lambda x: x[0])
+
+        # 计算时间加权的平均并发任务数
+        total_task_time = 0.0
+        concurrent = 0
+        prev_time = None
+
+        for time, delta in events:
+            if prev_time is not None:
+                duration = time - prev_time
+                total_task_time += concurrent * duration
+            concurrent += delta
+            prev_time = time
+
+        return total_task_time / total_time
 
     def get_peak_memory_utilization(self) -> float:
         """
@@ -199,6 +255,41 @@ class GPU:
             max_usage = max(max_usage, used_memory)
 
         return max_usage / self.memory_capacity
+
+    def get_average_memory_utilization(self, total_time: float) -> float:
+        """
+        计算时间加权的平均显存利用率
+
+        Args:
+            total_time: 总仿真时间
+
+        Returns:
+            平均显存利用率 (0-1)
+        """
+        if total_time == 0 or not self.timeline:
+            return 0.0
+
+        # 收集所有带任务信息的时间点事件
+        events = []
+        for start, end, task in self.timeline:
+            events.append((start, 1, task.memory))   # 开始事件，+显存
+            events.append((end, -1, task.memory))    # 结束事件，-显存
+
+        events.sort(key=lambda x: x[0])
+
+        # 计算时间加权的平均显存使用
+        total_memory_time = 0.0
+        concurrent_memory = 0
+        prev_time = None
+
+        for time, delta, memory in events:
+            if prev_time is not None:
+                duration = time - prev_time
+                total_memory_time += concurrent_memory * duration
+            concurrent_memory += delta * memory
+            prev_time = time
+
+        return total_memory_time / (self.memory_capacity * total_time)
 
     def get_current_utilization(self, current_time: float) -> float:
         """

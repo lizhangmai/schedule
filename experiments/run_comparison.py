@@ -146,7 +146,10 @@ def run_experiment(
         logging.info(f"  Makespan: {metrics.makespan:.2f}")
         logging.info(f"  Weighted Tardiness: {metrics.weighted_tardiness:.2f}")
         logging.info(f"  Deadline Miss Rate: {metrics.deadline_miss_rate:.2%}")
-        logging.info(f"  GPU Compute Util: {metrics.gpu_compute_utilization:.2%}")
+        logging.info(f"  GPU Time Util: {metrics.gpu_time_utilization:.2%}")
+        logging.info(f"  Avg Concurrent Tasks: {metrics.gpu_average_concurrent_tasks:.2f}")
+        logging.info(f"  Peak Memory Util: {metrics.gpu_peak_memory_utilization:.2%}")
+        logging.info(f"  Avg Memory Util: {metrics.gpu_average_memory_utilization:.2%}")
 
     return results
 
@@ -207,14 +210,14 @@ def save_results(
 
     # GPU 利用率对比 - 使用每个算法对应的集群
     algorithms = []
-    compute_utils = []
-    memory_utils = []
+    time_utils = []
+    peak_memory_utils = []
 
     for algo_name, (result, cluster) in results.items():
         metrics = MetricsCalculator.calculate(result.tasks, cluster, result)
         algorithms.append(algo_name)
-        compute_utils.append(metrics.gpu_compute_utilization)
-        memory_utils.append(metrics.gpu_memory_utilization)
+        time_utils.append(metrics.gpu_time_utilization)
+        peak_memory_utils.append(metrics.gpu_peak_memory_utilization)
 
     import numpy as np
     import matplotlib.pyplot as plt
@@ -224,8 +227,8 @@ def save_results(
 
     fig, ax = plt.subplots(figsize=(10, 6))
 
-    bars1 = ax.bar(x - width / 2, compute_utils, width, label="Compute Utilization", alpha=0.8)
-    bars2 = ax.bar(x + width / 2, memory_utils, width, label="Memory Utilization", alpha=0.8)
+    bars1 = ax.bar(x - width / 2, time_utils, width, label="Time Utilization", alpha=0.8)
+    bars2 = ax.bar(x + width / 2, peak_memory_utils, width, label="Peak Memory Utilization", alpha=0.8)
 
     ax.set_xlabel("Algorithm")
     ax.set_ylabel("Utilization")
