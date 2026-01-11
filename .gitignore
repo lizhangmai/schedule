@@ -87,9 +87,8 @@ results/
 *.jpeg
 *.pdf
 
-# Data files (optional - uncomment if you don't want to track data)
-# tasks1.csv
-# tasks2.csv
+# Data files (optional - uncomment if you don't want to track generated data)
+# data/tasks*.csv
 
 # OS
 .DS_Store

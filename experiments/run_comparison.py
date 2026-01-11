@@ -269,14 +269,29 @@ def save_results(
 
 def run_full_experiments() -> None:
     """运行完整实验矩阵"""
-    # 实验配置
-    datasets = ["tasks1.csv", "tasks2.csv"]
+    # 自动扫描 data/ 目录获取所有数据集
+    data_dir = Path(__file__).parent.parent / "data"
+    dataset_files = sorted(data_dir.glob("tasks*.csv"))
+
+    if not dataset_files:
+        logging.warning(f"No datasets found in {data_dir}")
+        return
+
+    # 转换为相对路径格式 (data/tasksX.csv)
+    datasets = [f"data/{f.name}" for f in dataset_files]
+
     cluster_sizes = ["small", "medium", "large"]
     algorithms = ["FIFO", "SPT", "EDF", "MultiObjective"]
 
     results_dir = Path(__file__).parent.parent / "results"
 
     for dataset in datasets:
+        # 处理路径，支持 data/tasksX.csv 格式
+        if dataset.startswith("data/"):
+            dataset_name = dataset[5:]  # 去掉 "data/" 前缀
+        else:
+            dataset_name = dataset
+
         data_path = Path(__file__).parent.parent / dataset
         if not data_path.exists():
             logging.warning(f"{data_path} not found, skipping")
@@ -284,7 +299,7 @@ def run_full_experiments() -> None:
 
         for cluster_size in cluster_sizes:
             logging.info(f"{'='*60}")
-            logging.info(f"Experiment: {dataset} - {cluster_size} cluster")
+            logging.info(f"Experiment: {dataset_name} - {cluster_size} cluster")
             logging.info(f"{'='*60}")
 
             results = run_experiment(
@@ -293,8 +308,8 @@ def run_full_experiments() -> None:
                 algorithms=algorithms,
             )
 
-            # 保存结果
-            experiment_name = f"{dataset[:-4]}_{cluster_size}"
+            # 保存结果 (使用 dataset 的文件名，不含扩展名)
+            experiment_name = f"{dataset_name[:-4]}_{cluster_size}"
             save_results(
                 results,
                 str(results_dir),
@@ -305,7 +320,8 @@ def run_full_experiments() -> None:
 def main():
     """主函数"""
     parser = argparse.ArgumentParser(description="GPU Scheduling Experiment")
-    parser.add_argument("--dataset", type=str, default="tasks1.csv", help="Dataset file")
+    parser.add_argument("--dataset", type=str, default="data/tasks1.csv",
+                        help="Dataset file (e.g., data/tasks1.csv)")
     parser.add_argument("--cluster", type=str, default="small", choices=["small", "medium", "large"],
                         help="Cluster size")
     parser.add_argument("--algorithms", type=str, nargs="+",
@@ -322,10 +338,25 @@ def main():
         setup_logging(results_dir)
         run_full_experiments()
     else:
-        experiment_name = f"{args.dataset[:-4]}_{args.cluster}"
+        # 处理数据集路径和名称
+        dataset_path = args.dataset
+        if not dataset_path.startswith("data/"):
+            # 兼容旧格式，自动添加 data/ 前缀
+            dataset_path = f"data/{args.dataset}"
+
+        # 提取数据集名称（不含路径和扩展名）
+        dataset_name = Path(dataset_path).stem  # 获取文件名不含扩展名
+        experiment_name = f"{dataset_name}_{args.cluster}"
+
         setup_logging(results_dir, experiment_name)
 
-        data_path = Path(__file__).parent.parent / args.dataset
+        # 构造完整的数据文件路径
+        data_path = Path(__file__).parent.parent / dataset_path
+        if not data_path.exists():
+            logging.error(f"Dataset file not found: {data_path}")
+            logging.info(f"Use 'python generate_tasks.py' to generate datasets.")
+            return
+
         results = run_experiment(str(data_path), args.cluster, args.algorithms)
 
         save_results(

@@ -37,7 +37,7 @@ from src.algorithms.heuristic.multi_objective_scheduler import MultiObjectiveSch
 from src.metrics.calculator import MetricsCalculator
 
 # 加载任务数据
-tasks = load_tasks_from_csv('tasks1.csv')
+tasks = load_tasks_from_csv('data/tasks1.csv')
 
 # 创建 GPU 集群
 cluster = create_small_cluster()
@@ -96,14 +96,19 @@ Score = α·Urgency + β·Efficiency + γ·MemoryFit + δ·Utilization
 ## 运行实验
 
 ```bash
-# 运行单个实验
-python experiments/run_comparison.py --dataset tasks1.csv --cluster small
+# 生成任务数据集
+python generate_tasks.py --task-id 3              # 生成 tasks3.csv
+python generate_tasks.py --task-ids 3,4,5         # 生成多个数据集
+python generate_tasks.py --all                    # 生成所有缺失的数据集
 
-# 运行完整实验矩阵（所有数据集和集群规模）
+# 运行单个实验
+python experiments/run_comparison.py --dataset data/tasks1.csv --cluster small
+
+# 运行完整实验矩阵（自动扫描 data/ 目录所有数据集）
 python experiments/run_comparison.py --full
 
 # 指定算法
-python experiments/run_comparison.py --algorithms FIFO MultiObjective
+python experiments/run_comparison.py --dataset data/tasks1.csv --algorithms FIFO MultiObjective
 ```
 
 ## 评估指标
@@ -137,12 +142,15 @@ schedule/
 │   ├── utils/                     # 工具函数
 │   └── visualization/             # 可视化
 ├── config/                        # 配置文件
+├── data/                          # 数据集目录
+│   ├── tasks1.csv                 # 数据集 1
+│   ├── tasks2.csv                 # 数据集 2
+│   └── ...                        # 更多数据集
 ├── experiments/                   # 实验脚本
 ├── results/                       # 结果输出
 │   ├── metrics/                   # 指标数据
 │   └── figures/                   # 可视化图表
-├── tasks1.csv                     # 数据集 1
-├── tasks2.csv                     # 数据集 2
+├── generate_tasks.py              # 数据集生成脚本
 └── requirements.txt
 ```
 
