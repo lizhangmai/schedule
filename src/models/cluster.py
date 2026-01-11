@@ -10,6 +10,18 @@ if TYPE_CHECKING:
     from .task import Task
 
 
+# 从配置文件导入 GPU 配置
+try:
+    from config.gpu_configs import GPU_CONFIGS
+except ImportError:
+    # 如果导入失败，使用默认值
+    GPU_CONFIGS = {
+        "A100": {"memory_capacity": 80, "scaling_factor": 114.0},
+        "A30": {"memory_capacity": 24, "scaling_factor": 60.0},
+        "L40": {"memory_capacity": 48, "scaling_factor": 111.0},
+    }
+
+
 @dataclass
 class Cluster:
     """
@@ -103,9 +115,15 @@ class Cluster:
 def create_small_cluster() -> Cluster:
     """创建小规模集群：3 个 GPU (A100, A30, L40 各 1 个)"""
     configs = [
-        {"gpu_id": "A100-1", "model": "A100", "memory_capacity": 80, "scaling_factor": 2.0},
-        {"gpu_id": "A30-1", "model": "A30", "memory_capacity": 24, "scaling_factor": 1.0},
-        {"gpu_id": "L40-1", "model": "L40", "memory_capacity": 48, "scaling_factor": 1.5},
+        {"gpu_id": "A100-1", "model": "A100",
+         "memory_capacity": GPU_CONFIGS["A100"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["A100"]["scaling_factor"]},
+        {"gpu_id": "A30-1", "model": "A30",
+         "memory_capacity": GPU_CONFIGS["A30"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["A30"]["scaling_factor"]},
+        {"gpu_id": "L40-1", "model": "L40",
+         "memory_capacity": GPU_CONFIGS["L40"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["L40"]["scaling_factor"]},
     ]
     return Cluster.from_configs(configs)
 
@@ -113,12 +131,24 @@ def create_small_cluster() -> Cluster:
 def create_medium_cluster() -> Cluster:
     """创建中等规模集群：6 个 GPU (每种 2 个)"""
     configs = [
-        {"gpu_id": "A100-1", "model": "A100", "memory_capacity": 80, "scaling_factor": 2.0},
-        {"gpu_id": "A100-2", "model": "A100", "memory_capacity": 80, "scaling_factor": 2.0},
-        {"gpu_id": "A30-1", "model": "A30", "memory_capacity": 24, "scaling_factor": 1.0},
-        {"gpu_id": "A30-2", "model": "A30", "memory_capacity": 24, "scaling_factor": 1.0},
-        {"gpu_id": "L40-1", "model": "L40", "memory_capacity": 48, "scaling_factor": 1.5},
-        {"gpu_id": "L40-2", "model": "L40", "memory_capacity": 48, "scaling_factor": 1.5},
+        {"gpu_id": "A100-1", "model": "A100",
+         "memory_capacity": GPU_CONFIGS["A100"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["A100"]["scaling_factor"]},
+        {"gpu_id": "A100-2", "model": "A100",
+         "memory_capacity": GPU_CONFIGS["A100"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["A100"]["scaling_factor"]},
+        {"gpu_id": "A30-1", "model": "A30",
+         "memory_capacity": GPU_CONFIGS["A30"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["A30"]["scaling_factor"]},
+        {"gpu_id": "A30-2", "model": "A30",
+         "memory_capacity": GPU_CONFIGS["A30"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["A30"]["scaling_factor"]},
+        {"gpu_id": "L40-1", "model": "L40",
+         "memory_capacity": GPU_CONFIGS["L40"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["L40"]["scaling_factor"]},
+        {"gpu_id": "L40-2", "model": "L40",
+         "memory_capacity": GPU_CONFIGS["L40"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["L40"]["scaling_factor"]},
     ]
     return Cluster.from_configs(configs)
 
@@ -126,13 +156,19 @@ def create_medium_cluster() -> Cluster:
 def create_large_cluster() -> Cluster:
     """创建大规模集群：9 个 GPU (每种 3 个)"""
     configs = [
-        {"gpu_id": f"A100-{i}", "model": "A100", "memory_capacity": 80, "scaling_factor": 2.0}
+        {"gpu_id": f"A100-{i}", "model": "A100",
+         "memory_capacity": GPU_CONFIGS["A100"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["A100"]["scaling_factor"]}
         for i in range(1, 4)
     ] + [
-        {"gpu_id": f"A30-{i}", "model": "A30", "memory_capacity": 24, "scaling_factor": 1.0}
+        {"gpu_id": f"A30-{i}", "model": "A30",
+         "memory_capacity": GPU_CONFIGS["A30"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["A30"]["scaling_factor"]}
         for i in range(1, 4)
     ] + [
-        {"gpu_id": f"L40-{i}", "model": "L40", "memory_capacity": 48, "scaling_factor": 1.5}
+        {"gpu_id": f"L40-{i}", "model": "L40",
+         "memory_capacity": GPU_CONFIGS["L40"]["memory_capacity"],
+         "scaling_factor": GPU_CONFIGS["L40"]["scaling_factor"]}
         for i in range(1, 4)
     ]
     return Cluster.from_configs(configs)

@@ -5,18 +5,21 @@ GPU 配置定义
 from typing import Dict, List
 
 # GPU 型号配置
+# scaling_factor 基于：
+# 1. 实际 GPU 算力比值 (A100 FP32: ~19.5 TFLOPS, A30: ~10.3 TFLOPS, L40: ~19.1 TFLOPS)
+# 2. 任务时间要求 - 让单个 GPU 无法独立完成所有任务，必须多 GPU 协作
 GPU_CONFIGS: Dict[str, Dict[str, int | float]] = {
     "A100": {
         "memory_capacity": 80,  # GB
-        "scaling_factor": 2.0,
+        "scaling_factor": 57.0,  # ≈ 30 × 1.9 (A100 约为 A30 的 1.9 倍)
     },
     "A30": {
         "memory_capacity": 24,  # GB
-        "scaling_factor": 1.0,
+        "scaling_factor": 30.0,  # 基准值，99.9% 的任务可按时完成
     },
     "L40": {
         "memory_capacity": 48,  # GB
-        "scaling_factor": 1.5,
+        "scaling_factor": 55.5,  # ≈ 30 × 1.85 (L40 约为 A30 的 1.85 倍)
     },
 }
 

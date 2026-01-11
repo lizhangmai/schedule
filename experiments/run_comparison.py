@@ -211,13 +211,13 @@ def save_results(
     # GPU 利用率对比 - 使用每个算法对应的集群
     algorithms = []
     time_utils = []
-    peak_memory_utils = []
+    avg_memory_utils = []
 
     for algo_name, (result, cluster) in results.items():
         metrics = MetricsCalculator.calculate(result.tasks, cluster, result)
         algorithms.append(algo_name)
         time_utils.append(metrics.gpu_time_utilization)
-        peak_memory_utils.append(metrics.gpu_peak_memory_utilization)
+        avg_memory_utils.append(metrics.gpu_average_memory_utilization)
 
     import numpy as np
     import matplotlib.pyplot as plt
@@ -228,7 +228,7 @@ def save_results(
     fig, ax = plt.subplots(figsize=(10, 6))
 
     bars1 = ax.bar(x - width / 2, time_utils, width, label="Time Utilization", alpha=0.8)
-    bars2 = ax.bar(x + width / 2, peak_memory_utils, width, label="Peak Memory Utilization", alpha=0.8)
+    bars2 = ax.bar(x + width / 2, avg_memory_utils, width, label="Average Memory Utilization", alpha=0.8)
 
     ax.set_xlabel("Algorithm")
     ax.set_ylabel("Utilization")

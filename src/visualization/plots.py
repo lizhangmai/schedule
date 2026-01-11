@@ -106,8 +106,8 @@ class PlotGenerator:
         for algo_name, result in results.items():
             metrics = MetricsCalculator.calculate(result.tasks, cluster, result)
             algorithms.append(algo_name)
-            compute_utils.append(metrics.gpu_compute_utilization)
-            memory_utils.append(metrics.gpu_memory_utilization)
+            compute_utils.append(metrics.gpu_time_utilization)
+            memory_utils.append(metrics.gpu_average_memory_utilization)
 
         x = np.arange(len(algorithms))
         width = 0.35

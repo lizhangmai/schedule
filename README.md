@@ -57,7 +57,8 @@ metrics = MetricsCalculator.calculate(scheduled_tasks, cluster, result)
 
 print(f"Makespan: {metrics.makespan:.2f}")
 print(f"Deadline Miss Rate: {metrics.deadline_miss_rate:.2%}")
-print(f"GPU Compute Utilization: {metrics.gpu_compute_utilization:.2%}")
+print(f"GPU Time Utilization: {metrics.gpu_time_utilization:.2%}")
+print(f"GPU Average Memory Utilization: {metrics.gpu_average_memory_utilization:.2%}")
 ```
 
 ## GPU 配置
