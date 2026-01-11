@@ -109,25 +109,19 @@ class GPU:
         if not self.can_accommodate(task):
             return float('inf')
 
-        sorted_timeline = sorted(self.timeline, key=lambda x: x[1])
+        # 收集所有候选开始时间点
+        candidate_times = [after_time]
+        for start, end, _ in self.timeline:
+            if end > after_time:
+                candidate_times.append(end)
 
-        if self.can_start_at(task, after_time):
-            return after_time
+        # 按时间排序
+        candidate_times = sorted(set(candidate_times))
 
-        candidate_time = after_time
-        for start, end, _ in sorted_timeline:
-            if end <= after_time:
-                continue
-
-            if end >= candidate_time and self.can_start_at(task, end):
-                return end
-
-            candidate_time = max(candidate_time, end)
-
-        if sorted_timeline:
-            last_end = max(end for _, end, _ in sorted_timeline)
-            if last_end >= candidate_time and self.can_start_at(task, last_end):
-                return last_end
+        # 尝试每个候选时间
+        for candidate in candidate_times:
+            if self.can_start_at(task, candidate):
+                return candidate
 
         return float('inf')
 

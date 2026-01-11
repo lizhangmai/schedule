@@ -89,6 +89,12 @@ class Task:
         """判断任务是否已被调度"""
         return self.assigned_gpu is not None and self.start_time is not None
 
+    def reset(self) -> None:
+        """重置任务的调度状态（用于多次调度场景）"""
+        self.assigned_gpu = None
+        self.start_time = None
+        self.completion_time = None
+
     def __lt__(self, other: "Task") -> bool:
         """
         支持多种比较方式，用于不同调度算法的排序
@@ -98,7 +104,12 @@ class Task:
 
     def __repr__(self) -> str:
         gpu_info = f"GPU={self.assigned_gpu.gpu_id}" if self.assigned_gpu else "GPU=None"
-        time_info = f"[{self.start_time:.2f}->{self.completion_time:.2f}]" if self.start_time is not None else "[unscheduled]"
+        if self.start_time is not None and self.completion_time is not None:
+            time_info = f"[{self.start_time:.2f}->{self.completion_time:.2f}]"
+        elif self.start_time is not None:
+            time_info = f"[{self.start_time:.2f}->?]"
+        else:
+            time_info = "[unscheduled]"
         return f"Task({self.task_id}, {gpu_info}, {time_info})"
 
 

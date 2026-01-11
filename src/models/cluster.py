@@ -14,11 +14,11 @@ if TYPE_CHECKING:
 try:
     from config.gpu_configs import GPU_CONFIGS
 except ImportError:
-    # 如果导入失败，使用默认值
+    # 如果导入失败，使用默认值（需与 config/gpu_configs.py 保持一致）
     GPU_CONFIGS = {
-        "A100": {"memory_capacity": 80, "scaling_factor": 114.0},
-        "A30": {"memory_capacity": 24, "scaling_factor": 60.0},
-        "L40": {"memory_capacity": 48, "scaling_factor": 111.0},
+        "A100": {"memory_capacity": 80, "scaling_factor": 57.0},
+        "A30": {"memory_capacity": 24, "scaling_factor": 30.0},
+        "L40": {"memory_capacity": 48, "scaling_factor": 55.5},
     }
 
 
@@ -103,8 +103,12 @@ class Cluster:
         }
 
     def reset(self) -> None:
-        """重置集群状态（清空所有 GPU 时间线）"""
+        """重置集群状态（清空所有 GPU 时间线和任务调度状态）"""
         for gpu in self.gpus:
+            # 重置所有关联任务的调度状态
+            for _, _, task in gpu.timeline:
+                task.reset()
+            # 清空时间线
             gpu.timeline.clear()
 
     def __repr__(self) -> str:

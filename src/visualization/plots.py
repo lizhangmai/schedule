@@ -176,13 +176,10 @@ class PlotGenerator:
 
         scheduled_tasks = [t for t in result.tasks if t.is_scheduled()][:max_tasks]
 
-        colors = []
         for task in scheduled_tasks:
             if task.assigned_gpu:
                 gpu_id = task.assigned_gpu.gpu_id
                 gpu_tasks[gpu_id].append(task)
-                # 根据 deadline miss 决定颜色
-                colors.append("#ff6b6b" if task.is_deadline_missed() else "#51cf66")
 
         # 绘制甘特图
         y_pos = 0

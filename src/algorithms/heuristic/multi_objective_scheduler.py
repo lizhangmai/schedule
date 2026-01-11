@@ -79,13 +79,36 @@ class MultiObjectiveScheduler(BaseScheduler):
             ready_tasks = [t for t in unscheduled_tasks if t.arrival_time <= self.current_time]
 
             if not ready_tasks:
-                self.current_time = min(t.arrival_time for t in unscheduled_tasks)
+                # 跳转到下一个任务到达时间
+                next_arrival = min(t.arrival_time for t in unscheduled_tasks)
+                self.current_time = next_arrival
                 continue
 
             best_assignment = self._find_best_assignment(ready_tasks)
 
             if not best_assignment:
-                break
+                # 当前 ready_tasks 无法调度，检查是否应该等待 GPU 可用
+                # 找到当前正在运行的 GPU 中最早结束的时间
+                earliest_end = None
+                for gpu in self.cluster.gpus:
+                    if gpu.timeline:
+                        for start, end, _ in gpu.timeline:
+                            if end > self.current_time:
+                                if earliest_end is None or end < earliest_end:
+                                    earliest_end = end
+
+                if earliest_end is not None and earliest_end < max(t.arrival_time for t in ready_tasks):
+                    # GPU 会在新任务到达前释放，等待
+                    self.current_time = earliest_end
+                    continue
+                else:
+                    # 无法调度，推进到下一个未调度任务的到达时间
+                    next_arrival = min(t.arrival_time for t in unscheduled_tasks if t.arrival_time > self.current_time)
+                    if next_arrival > self.current_time:
+                        self.current_time = next_arrival
+                        continue
+                    # 所有任务都已到达但仍无法调度，终止
+                    break
 
             best_task, best_gpu, best_start_time = best_assignment
             best_gpu.add_task(best_task, best_start_time)

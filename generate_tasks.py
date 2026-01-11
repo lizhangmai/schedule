@@ -91,7 +91,8 @@ def generate_tasks(
         arrival_time_range: 到达时间范围
         deadline_factor_range: deadline 因子范围
             deadline = arrival + execution_time * factor
-            factor >= 1.0 表示有一定时间余量
+            factor < 1.0: 任务注定错过 deadline (用于压力测试)
+            factor >= 1.0: 有一定时间余量
         weight_range: 权重范围
         baseline_scaling_factor: 基准 GPU 的 scaling_factor (用于计算执行时间)
 

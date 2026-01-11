@@ -130,10 +130,22 @@ def run_experiment(
         scheduler = create_scheduler(algo_name, cluster)
         scheduled_tasks = scheduler.schedule(tasks)
 
-        # 创建仿真结果
+        # 创建仿真结果（提取有效完成时间）
+        completion_times = [t.completion_time for t in scheduled_tasks if t.completion_time is not None]
+        makespan = max(completion_times) if completion_times else 0.0
+
+        # 边界情况警告
+        if makespan == 0 and scheduled_tasks:
+            logging.warning(
+                f"  {algo_name}: Makespan is 0 but {len(scheduled_tasks)} tasks exist. "
+                "Check if tasks were properly scheduled."
+            )
+        elif makespan == 0 and not scheduled_tasks:
+            logging.warning(f"  {algo_name}: No tasks were scheduled.")
+
         result = SimulationResult(
             tasks=scheduled_tasks,
-            makespan=max(t.completion_time for t in scheduled_tasks if t.completion_time) if scheduled_tasks else 0,
+            makespan=makespan,
             total_weighted_tardiness=sum(t.get_weighted_tardiness() for t in scheduled_tasks),
             metadata={"algorithm": algo_name},
         )
@@ -197,7 +209,9 @@ def save_results(
 
     # 3. 生成可视化图表到 figures/ 子目录
 
-    # 算法对比柱状图 - 使用第一个算法的集群进行可视化
+    # 算法对比柱状图
+    # Note: 此图表只绘制不依赖 GPU timeline 的指标（完成时间、deadline miss 等）
+    # 因此使用 first_cluster 作为参数是安全的，这些指标只基于任务数据计算
     first_cluster = next(iter(results.values()))[1]
     comparison_path = figures_dir / f"{experiment_name}_comparison.png"
     PlotGenerator.plot_algorithm_comparison(

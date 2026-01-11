@@ -2,6 +2,7 @@
 CSV 数据加载器
 """
 
+import logging
 from pathlib import Path
 from typing import List
 
@@ -24,21 +25,80 @@ def load_tasks_from_csv(file_path: str | Path) -> List[Task]:
         Task,Workload,Memory,Deadline,Weight,ArrivalTime
         T1,211,24,17.98,4,0.36
         ...
+
+    Raises:
+        FileNotFoundError: 文件不存在
+        ValueError: CSV 格式或数据无效
     """
-    df = pd.read_csv(file_path)
+    # 读取 CSV 文件
+    try:
+        df = pd.read_csv(file_path)
+    except FileNotFoundError:
+        raise FileNotFoundError(f"Task file not found: {file_path}")
+    except pd.errors.EmptyDataError:
+        raise ValueError(f"CSV file is empty: {file_path}")
+    except Exception as e:
+        raise ValueError(f"Failed to read CSV {file_path}: {e}")
 
+    # 验证必需的列
+    required_columns = ["Task", "Workload", "Memory", "Deadline", "Weight", "ArrivalTime"]
+    missing_columns = [col for col in required_columns if col not in df.columns]
+    if missing_columns:
+        raise ValueError(f"Missing required columns: {missing_columns}")
+
+    # 检查缺失值
+    if df[required_columns].isnull().any().any():
+        nan_info = df[required_columns].isnull().sum()
+        nan_columns = [col for col in required_columns if nan_info[col] > 0]
+        raise ValueError(f"CSV contains missing values in columns: {nan_columns}")
+
+    # 验证并转换每一行
     tasks = []
-    for _, row in df.iterrows():
-        task = Task(
-            task_id=str(row["Task"]),
-            workload=float(row["Workload"]),
-            memory=int(row["Memory"]),
-            deadline=float(row["Deadline"]),
-            weight=int(row["Weight"]),
-            arrival_time=float(row["ArrivalTime"]),
-        )
-        tasks.append(task)
+    for idx, row in df.iterrows():
+        try:
+            task_id = str(row["Task"])
+            workload = float(row["Workload"])
+            memory = int(row["Memory"])
+            deadline = float(row["Deadline"])
+            weight = int(row["Weight"])
+            arrival_time = float(row["ArrivalTime"])
 
+            # 业务逻辑验证
+            if workload <= 0:
+                raise ValueError(f"Row {idx + 1}: Workload must be positive, got {workload}")
+            if memory <= 0:
+                raise ValueError(f"Row {idx + 1}: Memory must be positive, got {memory}")
+            if deadline < 0:
+                raise ValueError(f"Row {idx + 1}: Deadline must be non-negative, got {deadline}")
+            if weight <= 0:
+                raise ValueError(f"Row {idx + 1}: Weight must be positive, got {weight}")
+            if arrival_time < 0:
+                raise ValueError(f"Row {idx + 1}: Arrival time must be non-negative, got {arrival_time}")
+
+            # 警告但不阻止：deadline 早于 arrival_time
+            if deadline < arrival_time:
+                logging.warning(
+                    f"Row {idx + 1} ({task_id}): Deadline ({deadline:.2f}) is before "
+                    f"arrival time ({arrival_time:.2f}). Task will immediately miss deadline."
+                )
+
+            task = Task(
+                task_id=task_id,
+                workload=workload,
+                memory=memory,
+                deadline=deadline,
+                weight=weight,
+                arrival_time=arrival_time,
+            )
+            tasks.append(task)
+
+        except (ValueError, TypeError) as e:
+            raise ValueError(f"Invalid data in row {idx + 1}: {e}")
+
+    if not tasks:
+        raise ValueError(f"No valid tasks found in {file_path}")
+
+    logging.info(f"Loaded {len(tasks)} tasks from {file_path}")
     return tasks
 
 
