@@ -1,0 +1,247 @@
+"""
+GPU 类：表示一个 GPU 计算资源
+"""
+
+from dataclasses import dataclass, field
+from typing import TYPE_CHECKING, Optional, List, Tuple
+
+if TYPE_CHECKING:
+    from .task import Task
+
+
+@dataclass
+class GPU:
+    """
+    GPU 类：表示一个 GPU 计算资源
+
+    属性:
+        gpu_id: str - GPU 唯一标识符
+        model: str - GPU 型号 (A100/A30/L40)
+        memory_capacity: int - 显存容量 (GB)
+        scaling_factor: float - 计算能力因子
+
+    状态属性:
+        timeline: List[Tuple[float, float, Task]] - 任务执行时间线
+            每个元组表示 (start_time, completion_time, task)
+    """
+
+    gpu_id: str
+    model: str
+    memory_capacity: int
+    scaling_factor: float
+
+    # 时间线：(开始时间, 完成时间, 任务)
+    timeline: List[Tuple[float, float, "Task"]] = field(default_factory=list, repr=False)
+
+    def can_accommodate(self, task: "Task") -> bool:
+        """
+        检查是否有足够显存容纳任务
+
+        Args:
+            task: 任务对象
+
+        Returns:
+            如果任务显存需求 <= GPU 显存容量返回 True
+        """
+        return task.memory <= self.memory_capacity
+
+    def get_available_memory_at(self, time: float) -> int:
+        """
+        获取指定时刻的可用显存
+
+        Args:
+            time: 查询时刻
+
+        Returns:
+            可用显存 (GB)
+        """
+        used_memory = 0
+        for start, end, task in self.timeline:
+            if start <= time < end:
+                used_memory += task.memory
+        return self.memory_capacity - used_memory
+
+    def can_start_at(self, task: "Task", start_time: float) -> bool:
+        """
+        检查任务在指定时间是否可以开始（考虑显存）
+
+        Args:
+            task: 任务对象
+            start_time: 计划开始时间
+
+        Returns:
+            如果任务可以在 start_time 开始返回 True
+        """
+        # 首先检查基本显存容量
+        if not self.can_accommodate(task):
+            return False
+
+        execution_time = task.get_execution_time(self)
+        completion_time = start_time + execution_time
+
+        # 检查整个执行期间的显存是否足够
+        # 我们需要在执行期间的任何时刻，显存使用都不超过容量
+        # 简化处理：检查每个时间点的并发任务显存总和
+
+        # 收集执行期间所有时间点（开始和结束时刻）
+        time_points = set()
+        time_points.add(start_time)
+        time_points.add(completion_time)
+
+        for t_start, t_end, t in self.timeline:
+            # 如果时间段与任务执行有重叠
+            if not (t_end <= start_time or t_start >= completion_time):
+                time_points.add(max(start_time, t_start))
+                time_points.add(min(completion_time, t_end))
+
+        # 在每个时间点检查显存
+        for t in sorted(time_points):
+            used_memory = task.memory  # 包含当前任务
+            for t_start, t_end, existing_task in self.timeline:
+                if t_start <= t < t_end:
+                    used_memory += existing_task.memory
+            if used_memory > self.memory_capacity:
+                return False
+
+        return True
+
+    def find_earliest_start_time(self, task: "Task", after_time: float = 0.0) -> float:
+        """
+        找到任务最早的可行开始时间
+
+        Args:
+            task: 任务对象
+            after_time: 最早开始时间下限
+
+        Returns:
+            最早的可行开始时间，如果不可行则返回 float('inf')
+        """
+        if not self.can_accommodate(task):
+            return float('inf')
+
+        # 按完成时间排序的时间线
+        sorted_timeline = sorted(self.timeline, key=lambda x: x[1])
+
+        # 尝试在 after_time 开始
+        if self.can_start_at(task, after_time):
+            return after_time
+
+        # 检查每个时间间隔
+        candidate_time = after_time
+        for i, (start, end, _) in enumerate(sorted_timeline):
+            if end <= after_time:
+                continue
+
+            # 尝试在当前任务完成后开始
+            if end >= candidate_time:
+                if self.can_start_at(task, end):
+                    return end
+                candidate_time = end
+
+        # 尝试在所有现有任务完成后开始
+        if sorted_timeline:
+            last_end = max(end for _, end, _ in sorted_timeline)
+            if last_end >= candidate_time:
+                if self.can_start_at(task, last_end):
+                    return last_end
+
+        return float('inf')
+
+    def add_task(self, task: "Task", start_time: float) -> None:
+        """
+        添加任务到 GPU，更新时间线
+
+        Args:
+            task: 任务对象
+            start_time: 开始时间
+        """
+        execution_time = task.get_execution_time(self)
+        completion_time = start_time + execution_time
+        self.timeline.append((start_time, completion_time, task))
+
+        # 更新任务状态
+        task.assigned_gpu = self
+        task.start_time = start_time
+        task.completion_time = completion_time
+
+    def get_completion_time(self, task: "Task", start_time: float) -> float:
+        """
+        计算任务完成时间
+
+        Args:
+            task: 任务对象
+            start_time: 开始时间
+
+        Returns:
+            完成时间
+        """
+        return start_time + task.get_execution_time(self)
+
+    def get_compute_utilization(self, total_time: float) -> float:
+        """
+        计算计算资源利用率
+
+        Args:
+            total_time: 总仿真时间
+
+        Returns:
+            利用率 (0-1)
+        """
+        if total_time == 0:
+            return 0.0
+
+        busy_time = 0.0
+        for start, end, task in self.timeline:
+            execution_time = task.get_execution_time(self)
+            busy_time += execution_time
+
+        return min(1.0, busy_time / total_time)
+
+    def get_peak_memory_utilization(self) -> float:
+        """
+        计算峰值显存利用率
+
+        Returns:
+            峰值显存利用率 (0-1)
+        """
+        if not self.timeline:
+            return 0.0
+
+        # 收集所有时间点
+        time_points = set()
+        for start, end, _ in self.timeline:
+            time_points.add(start)
+            time_points.add(end)
+
+        max_usage = 0
+        for t in time_points:
+            used_memory = 0
+            for start, end, task in self.timeline:
+                if start <= t < end:
+                    used_memory += task.memory
+            max_usage = max(max_usage, used_memory)
+
+        return max_usage / self.memory_capacity
+
+    def get_current_utilization(self, current_time: float) -> float:
+        """
+        获取当前时刻的 GPU 利用率（用于调度决策）
+
+        Args:
+            current_time: 当前时间
+
+        Returns:
+            当前利用率 (0-1)
+        """
+        used_memory = 0
+        for start, end, task in self.timeline:
+            if start <= current_time < end:
+                used_memory += task.memory
+        return used_memory / self.memory_capacity
+
+    def get_task_count(self) -> int:
+        """获取时间线上的任务数量"""
+        return len(self.timeline)
+
+    def __repr__(self) -> str:
+        return f"GPU({self.gpu_id}, {self.model}, {self.memory_capacity}GB, sf={self.scaling_factor})"
