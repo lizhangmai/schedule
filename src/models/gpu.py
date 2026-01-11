@@ -72,31 +72,21 @@ class GPU:
         Returns:
             如果任务可以在 start_time 开始返回 True
         """
-        # 首先检查基本显存容量
         if not self.can_accommodate(task):
             return False
 
         execution_time = task.get_execution_time(self)
         completion_time = start_time + execution_time
 
-        # 检查整个执行期间的显存是否足够
-        # 我们需要在执行期间的任何时刻，显存使用都不超过容量
-        # 简化处理：检查每个时间点的并发任务显存总和
+        time_points = {start_time, completion_time}
 
-        # 收集执行期间所有时间点（开始和结束时刻）
-        time_points = set()
-        time_points.add(start_time)
-        time_points.add(completion_time)
-
-        for t_start, t_end, t in self.timeline:
-            # 如果时间段与任务执行有重叠
+        for t_start, t_end, _ in self.timeline:
             if not (t_end <= start_time or t_start >= completion_time):
                 time_points.add(max(start_time, t_start))
                 time_points.add(min(completion_time, t_end))
 
-        # 在每个时间点检查显存
         for t in sorted(time_points):
-            used_memory = task.memory  # 包含当前任务
+            used_memory = task.memory
             for t_start, t_end, existing_task in self.timeline:
                 if t_start <= t < t_end:
                     used_memory += existing_task.memory
@@ -119,31 +109,25 @@ class GPU:
         if not self.can_accommodate(task):
             return float('inf')
 
-        # 按完成时间排序的时间线
         sorted_timeline = sorted(self.timeline, key=lambda x: x[1])
 
-        # 尝试在 after_time 开始
         if self.can_start_at(task, after_time):
             return after_time
 
-        # 检查每个时间间隔
         candidate_time = after_time
-        for i, (start, end, _) in enumerate(sorted_timeline):
+        for start, end, _ in sorted_timeline:
             if end <= after_time:
                 continue
 
-            # 尝试在当前任务完成后开始
-            if end >= candidate_time:
-                if self.can_start_at(task, end):
-                    return end
-                candidate_time = end
+            if end >= candidate_time and self.can_start_at(task, end):
+                return end
 
-        # 尝试在所有现有任务完成后开始
+            candidate_time = max(candidate_time, end)
+
         if sorted_timeline:
             last_end = max(end for _, end, _ in sorted_timeline)
-            if last_end >= candidate_time:
-                if self.can_start_at(task, last_end):
-                    return last_end
+            if last_end >= candidate_time and self.can_start_at(task, last_end):
+                return last_end
 
         return float('inf')
 
@@ -159,7 +143,6 @@ class GPU:
         completion_time = start_time + execution_time
         self.timeline.append((start_time, completion_time, task))
 
-        # 更新任务状态
         task.assigned_gpu = self
         task.start_time = start_time
         task.completion_time = completion_time
@@ -190,12 +173,8 @@ class GPU:
         if total_time == 0:
             return 0.0
 
-        busy_time = 0.0
-        for start, end, task in self.timeline:
-            execution_time = task.get_execution_time(self)
-            busy_time += execution_time
-
-        return min(1.0, busy_time / total_time)
+        busy_time = sum(end - start for start, end, _ in self.timeline)
+        return busy_time / total_time
 
     def get_peak_memory_utilization(self) -> float:
         """
@@ -207,18 +186,16 @@ class GPU:
         if not self.timeline:
             return 0.0
 
-        # 收集所有时间点
         time_points = set()
         for start, end, _ in self.timeline:
-            time_points.add(start)
-            time_points.add(end)
+            time_points.update([start, end])
 
         max_usage = 0
         for t in time_points:
-            used_memory = 0
-            for start, end, task in self.timeline:
-                if start <= t < end:
-                    used_memory += task.memory
+            used_memory = sum(
+                task.memory for start, end, task in self.timeline
+                if start <= t < end
+            )
             max_usage = max(max_usage, used_memory)
 
         return max_usage / self.memory_capacity
@@ -233,10 +210,10 @@ class GPU:
         Returns:
             当前利用率 (0-1)
         """
-        used_memory = 0
-        for start, end, task in self.timeline:
-            if start <= current_time < end:
-                used_memory += task.memory
+        used_memory = sum(
+            task.memory for start, end, task in self.timeline
+            if start <= current_time < end
+        )
         return used_memory / self.memory_capacity
 
     def get_task_count(self) -> int:

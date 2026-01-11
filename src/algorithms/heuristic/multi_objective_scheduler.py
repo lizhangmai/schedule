@@ -10,7 +10,7 @@
     4. 资源利用率 (Utilization): 考虑 GPU 当前利用情况
 """
 
-from typing import List, Tuple
+from typing import List, Optional, Tuple
 
 from ..base import BaseScheduler
 from ...models.task import Task
@@ -46,6 +46,7 @@ class MultiObjectiveScheduler(BaseScheduler):
         self.beta = beta
         self.gamma = gamma
         self.delta = delta
+        self.current_time = 0.0
 
     def schedule(self, tasks: List[Task]) -> List[Task]:
         """
@@ -65,57 +66,25 @@ class MultiObjectiveScheduler(BaseScheduler):
         Returns:
             调度后的任务列表
         """
-        # 重置集群状态
         self.cluster.reset()
 
-        # 按到达时间排序，作为基础顺序
         unscheduled_tasks = sorted(tasks, key=lambda t: (t.arrival_time, t.task_id))
 
-        # 迭代调度所有任务
         while unscheduled_tasks:
-            # 找到当前可调度的任务（已到达）
-            current_time = self._get_current_time()
-            ready_tasks = [t for t in unscheduled_tasks if t.arrival_time <= current_time]
+            ready_tasks = [t for t in unscheduled_tasks if t.arrival_time <= self.current_time]
 
             if not ready_tasks:
-                # 如果没有准备好的任务，推进到下一个任务的到达时间
-                current_time = min(t.arrival_time for t in unscheduled_tasks)
+                self.current_time = min(t.arrival_time for t in unscheduled_tasks)
+                continue
 
-            # 为每个准备好的任务找到最优 GPU
-            best_task = None
-            best_gpu = None
-            best_score = float('-inf')
-            best_start_time = float('inf')
+            best_assignment = self._find_best_assignment(ready_tasks)
 
-            for task in ready_tasks:
-                feasible_gpus = self.cluster.get_available_gpus(task)
-                if not feasible_gpus:
-                    continue
-
-                for gpu in feasible_gpus:
-                    # 计算最早开始时间
-                    start_time = max(task.arrival_time, current_time)
-                    earliest_start = gpu.find_earliest_start_time(task, start_time)
-
-                    if earliest_start == float('inf'):
-                        continue
-
-                    # 计算综合评分
-                    score = self._calculate_score(task, gpu, earliest_start)
-
-                    if score > best_score:
-                        best_score = score
-                        best_task = task
-                        best_gpu = gpu
-                        best_start_time = earliest_start
-
-            # 调度选中的任务
-            if best_task and best_gpu:
-                best_gpu.add_task(best_task, best_start_time)
-                unscheduled_tasks.remove(best_task)
-            else:
-                # 无法调度任何任务，跳出循环
+            if not best_assignment:
                 break
+
+            best_task, best_gpu, best_start_time = best_assignment
+            best_gpu.add_task(best_task, best_start_time)
+            unscheduled_tasks.remove(best_task)
 
         self.scheduled_tasks = [t for t in tasks if t.is_scheduled()]
         return self.scheduled_tasks
@@ -138,55 +107,61 @@ class MultiObjectiveScheduler(BaseScheduler):
         completion_time = start_time + execution_time
         remaining_time = task.deadline - completion_time
 
-        # 1. 时间紧急度：距离截止时间越近，分数越高
-        if remaining_time > 0:
-            urgency = 1.0 / max(remaining_time, 0.1)
-        else:
-            # 已经超过截止时间，给予最高紧急度
-            urgency = 10.0
+        urgency = 10.0 if remaining_time <= 0 else 1.0 / max(remaining_time, 0.1)
 
-        # 2. 执行效率：GPU 越强、执行时间越短，效率越高
         efficiency = gpu.scaling_factor / execution_time
 
-        # 3. 显存适配度：任务显存接近 GPU 容量一半时最优
-        #    这样可以保留空间用于并发执行
         optimal_memory = gpu.memory_capacity / 2
         memory_diff = abs(task.memory - optimal_memory)
         memory_fit = 1.0 - (memory_diff / optimal_memory)
 
-        # 4. GPU 利用率：优先选择空闲 GPU（负载均衡）
         utilization = 1.0 - gpu.get_current_utilization(start_time)
 
-        # 综合评分
-        score = (
+        return (
             self.alpha * urgency +
             self.beta * efficiency +
             self.gamma * memory_fit +
             self.delta * utilization
         )
 
-        return score
-
-    def _get_current_time(self) -> float:
+    def _find_best_assignment(self, ready_tasks: List[Task]) -> Optional[Tuple[Task, object, float]]:
         """
-        获取当前仿真时间
+        为准备好的任务找到最优 (task, gpu, start_time) 组合
 
-        基于已调度任务的最早开始时间
+        Args:
+            ready_tasks: 当前可调度的任务列表
 
         Returns:
-            当前时间
+            (best_task, best_gpu, best_start_time) 元组，如果没有可行分配则返回 None
         """
-        if not self.cluster.gpus:
-            return 0.0
+        best_task = None
+        best_gpu = None
+        best_score = float('-inf')
+        best_start_time = float('inf')
 
-        min_time = float('inf')
-        for gpu in self.cluster.gpus:
-            if gpu.timeline:
-                # 获取最早的任务开始时间
-                earliest = min(start for start, _, _ in gpu.timeline)
-                min_time = min(min_time, earliest)
+        for task in ready_tasks:
+            feasible_gpus = self.cluster.get_available_gpus(task)
+            if not feasible_gpus:
+                continue
 
-        return min_time if min_time != float('inf') else 0.0
+            for gpu in feasible_gpus:
+                start_time = max(task.arrival_time, self.current_time)
+                earliest_start = gpu.find_earliest_start_time(task, start_time)
+
+                if earliest_start == float('inf'):
+                    continue
+
+                score = self._calculate_score(task, gpu, earliest_start)
+
+                if score > best_score:
+                    best_score = score
+                    best_task = task
+                    best_gpu = gpu
+                    best_start_time = earliest_start
+
+        if best_task and best_gpu:
+            return (best_task, best_gpu, best_start_time)
+        return None
 
 
 # 复杂度分析：
