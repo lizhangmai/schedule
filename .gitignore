@@ -77,11 +77,11 @@ venv.bak/
 dmypy.json
 
 # Logs
-*.log
+# *.log
 logs/
 
 # Results and outputs
-results/
+# results/
 *.png
 *.jpg
 *.jpeg

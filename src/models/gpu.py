@@ -23,6 +23,9 @@ class GPU:
     状态属性:
         timeline: List[Tuple[float, float, Task]] - 任务执行时间线
             每个元组表示 (start_time, completion_time, task)
+
+    约束:
+        - 不支持并发执行：一个GPU同一时间只能运行一个任务
     """
 
     gpu_id: str
@@ -63,7 +66,9 @@ class GPU:
 
     def can_start_at(self, task: "Task", start_time: float) -> bool:
         """
-        检查任务在指定时间是否可以开始（考虑显存）
+        检查任务在指定时间是否可以开始
+
+        GPU 不支持并发执行：一个GPU同一时间只能运行一个任务。
 
         Args:
             task: 任务对象
@@ -72,25 +77,18 @@ class GPU:
         Returns:
             如果任务可以在 start_time 开始返回 True
         """
+        # 首先检查显存是否足够
         if not self.can_accommodate(task):
             return False
 
         execution_time = task.get_execution_time(self)
         completion_time = start_time + execution_time
 
-        time_points = {start_time, completion_time}
-
+        # 检查时间冲突：不能与任何现有任务的时间段重叠
         for t_start, t_end, _ in self.timeline:
-            if not (t_end <= start_time or t_start >= completion_time):
-                time_points.add(max(start_time, t_start))
-                time_points.add(min(completion_time, t_end))
-
-        for t in sorted(time_points):
-            used_memory = task.memory
-            for t_start, t_end, existing_task in self.timeline:
-                if t_start <= t < t_end:
-                    used_memory += existing_task.memory
-            if used_memory > self.memory_capacity:
+            # 如果时间段有重叠，则不能调度
+            # 不重叠的条件：新任务在现有任务之前开始并完成，或在之后开始
+            if not (completion_time <= t_start or start_time >= t_end):
                 return False
 
         return True
