@@ -12,14 +12,19 @@ if TYPE_CHECKING:
 
 # 从配置文件导入 GPU 配置
 try:
-    from config.gpu_configs import GPU_CONFIGS
+    from config.gpu_configs import GPU_CONFIGS, DEFAULT_BASE_SCALE, get_cluster_config as get_cluster_config_from_file
 except ImportError:
     # 如果导入失败，使用默认值（需与 config/gpu_configs.py 保持一致）
+    DEFAULT_BASE_SCALE = 30
     GPU_CONFIGS = {
         "A100": {"memory_capacity": 80, "scaling_factor": 57.0},
         "A30": {"memory_capacity": 24, "scaling_factor": 30.0},
         "L40": {"memory_capacity": 48, "scaling_factor": 55.5},
     }
+
+    def get_cluster_config_from_file(size: str, base_scale: float = DEFAULT_BASE_SCALE):
+        """默认实现"""
+        return []
 
 
 @dataclass
@@ -116,63 +121,43 @@ class Cluster:
         return f"Cluster([{gpu_info}])"
 
 
-def create_small_cluster() -> Cluster:
-    """创建小规模集群：3 个 GPU (A100, A30, L40 各 1 个)"""
-    configs = [
-        {"gpu_id": "A100-1", "model": "A100",
-         "memory_capacity": GPU_CONFIGS["A100"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["A100"]["scaling_factor"]},
-        {"gpu_id": "A30-1", "model": "A30",
-         "memory_capacity": GPU_CONFIGS["A30"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["A30"]["scaling_factor"]},
-        {"gpu_id": "L40-1", "model": "L40",
-         "memory_capacity": GPU_CONFIGS["L40"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["L40"]["scaling_factor"]},
-    ]
+def create_small_cluster(scaling_factor: float = DEFAULT_BASE_SCALE) -> Cluster:
+    """
+    创建小规模集群：3 个 GPU (A100, A30, L40 各 1 个)
+
+    Args:
+        scaling_factor: 基准缩放因子（A30 的 scaling_factor）
+
+    Returns:
+        小规模集群对象
+    """
+    configs = get_cluster_config_from_file("small", scaling_factor)
     return Cluster.from_configs(configs)
 
 
-def create_medium_cluster() -> Cluster:
-    """创建中等规模集群：6 个 GPU (每种 2 个)"""
-    configs = [
-        {"gpu_id": "A100-1", "model": "A100",
-         "memory_capacity": GPU_CONFIGS["A100"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["A100"]["scaling_factor"]},
-        {"gpu_id": "A100-2", "model": "A100",
-         "memory_capacity": GPU_CONFIGS["A100"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["A100"]["scaling_factor"]},
-        {"gpu_id": "A30-1", "model": "A30",
-         "memory_capacity": GPU_CONFIGS["A30"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["A30"]["scaling_factor"]},
-        {"gpu_id": "A30-2", "model": "A30",
-         "memory_capacity": GPU_CONFIGS["A30"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["A30"]["scaling_factor"]},
-        {"gpu_id": "L40-1", "model": "L40",
-         "memory_capacity": GPU_CONFIGS["L40"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["L40"]["scaling_factor"]},
-        {"gpu_id": "L40-2", "model": "L40",
-         "memory_capacity": GPU_CONFIGS["L40"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["L40"]["scaling_factor"]},
-    ]
+def create_medium_cluster(scaling_factor: float = DEFAULT_BASE_SCALE) -> Cluster:
+    """
+    创建中等规模集群：6 个 GPU (每种 2 个)
+
+    Args:
+        scaling_factor: 基准缩放因子（A30 的 scaling_factor）
+
+    Returns:
+        中等规模集群对象
+    """
+    configs = get_cluster_config_from_file("medium", scaling_factor)
     return Cluster.from_configs(configs)
 
 
-def create_large_cluster() -> Cluster:
-    """创建大规模集群：9 个 GPU (每种 3 个)"""
-    configs = [
-        {"gpu_id": f"A100-{i}", "model": "A100",
-         "memory_capacity": GPU_CONFIGS["A100"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["A100"]["scaling_factor"]}
-        for i in range(1, 4)
-    ] + [
-        {"gpu_id": f"A30-{i}", "model": "A30",
-         "memory_capacity": GPU_CONFIGS["A30"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["A30"]["scaling_factor"]}
-        for i in range(1, 4)
-    ] + [
-        {"gpu_id": f"L40-{i}", "model": "L40",
-         "memory_capacity": GPU_CONFIGS["L40"]["memory_capacity"],
-         "scaling_factor": GPU_CONFIGS["L40"]["scaling_factor"]}
-        for i in range(1, 4)
-    ]
+def create_large_cluster(scaling_factor: float = DEFAULT_BASE_SCALE) -> Cluster:
+    """
+    创建大规模集群：9 个 GPU (每种 3 个)
+
+    Args:
+        scaling_factor: 基准缩放因子（A30 的 scaling_factor）
+
+    Returns:
+        大规模集群对象
+    """
+    configs = get_cluster_config_from_file("large", scaling_factor)
     return Cluster.from_configs(configs)

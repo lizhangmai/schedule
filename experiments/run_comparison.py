@@ -76,6 +76,7 @@ def setup_logging(results_dir: str, experiment_name: str = None) -> None:
 def run_experiment(
     tasks_file: str,
     cluster_size: str = "small",
+    scaling_factor: float = 40.0,
     algorithms: List[str] = None,
 ) -> Dict[str, Tuple[SimulationResult, object]]:
     """
@@ -84,6 +85,7 @@ def run_experiment(
     Args:
         tasks_file: 任务数据文件路径
         cluster_size: 集群规模 (small/medium/large)
+        scaling_factor: GPU 缩放因子（A30 的基准值）
         algorithms: 要运行的算法列表
 
     Returns:
@@ -96,11 +98,22 @@ def run_experiment(
     tasks = load_tasks_from_csv(tasks_file)
     logging.info(f"Loaded {len(tasks)} tasks from {tasks_file}")
 
-    # 集群工厂
+    # 集群工厂（支持 scaling_factor）
+    def create_cluster(size: str, sf: float):
+        if size == "small":
+            return create_small_cluster(sf)
+        elif size == "medium":
+            return create_medium_cluster(sf)
+        elif size == "large":
+            return create_large_cluster(sf)
+        else:
+            raise ValueError(f"Unknown cluster size: {size}")
+
+    # 旧的集群工厂（保持兼容性）
     cluster_factories = {
-        "small": create_small_cluster,
-        "medium": create_medium_cluster,
-        "large": create_large_cluster,
+        "small": lambda: create_cluster("small", scaling_factor),
+        "medium": lambda: create_cluster("medium", scaling_factor),
+        "large": lambda: create_cluster("large", scaling_factor),
     }
 
     # 调度器工厂函数
@@ -120,9 +133,9 @@ def run_experiment(
     for algo_name in algorithms:
         logging.info(f"Running {algo_name}...")
 
-        # 关键修复：每个算法创建新的集群实例
+        # 关键修复：每个算法创建新的集群实例（使用 scaling_factor）
         cluster = cluster_factories[cluster_size]()
-        logging.info(f"  Created {cluster_size} cluster with {cluster.get_gpu_count()} GPUs")
+        logging.info(f"  Created {cluster_size} cluster with {cluster.get_gpu_count()} GPUs (scaling_factor={scaling_factor})")
 
         # 关键修复：每个算法使用任务的副本，避免状态污染
         from copy import deepcopy
@@ -289,6 +302,7 @@ def save_results(
     results: Dict[str, Tuple[SimulationResult, object]],
     output_dir: str,
     experiment_name: str,
+    config_name: str,
 ) -> None:
     """
     保存实验结果
@@ -297,8 +311,9 @@ def save_results(
         results: Dict[算法名, (仿真结果, 集群对象)]
         output_dir: 输出目录
         experiment_name: 实验名称
+        config_name: 配置名称（用于创建子目录）
     """
-    output_path = Path(output_dir)
+    output_path = Path(output_dir) / config_name
 
     # 创建子目录
     metrics_dir = output_path / "metrics"
@@ -308,7 +323,7 @@ def save_results(
     for dir_path in [metrics_dir, logs_dir, figures_dir, schedules_dir]:
         dir_path.mkdir(parents=True, exist_ok=True)
 
-    logging.info(f"Saving results for {experiment_name}...")
+    logging.info(f"Saving results for {experiment_name} to {output_path}...")
 
     # 1. 生成对比表格并保存到 metrics/ 子目录
     metrics_data = {}
@@ -539,8 +554,13 @@ def plot_from_saved(
     logging.info("All plots generated from saved schedule data.")
 
 
-def run_full_experiments() -> None:
-    """运行完整实验矩阵"""
+def run_full_experiments(scaling_factor: float = 40.0) -> None:
+    """
+    运行完整实验矩阵
+
+    Args:
+        scaling_factor: GPU 缩放因子（A30 的基准值）
+    """
     # 自动扫描 data/ 目录获取所有数据集
     data_dir = Path(__file__).parent.parent / "data"
     dataset_files = sorted(data_dir.glob("tasks*.csv"))
@@ -571,21 +591,25 @@ def run_full_experiments() -> None:
 
         for cluster_size in cluster_sizes:
             logging.info(f"{'='*60}")
-            logging.info(f"Experiment: {dataset_name} - {cluster_size} cluster")
+            logging.info(f"Experiment: {dataset_name} - {cluster_size} cluster - sf{scaling_factor}")
             logging.info(f"{'='*60}")
 
             results = run_experiment(
                 str(data_path),
                 cluster_size=cluster_size,
+                scaling_factor=scaling_factor,
                 algorithms=algorithms,
             )
 
-            # 保存结果 (使用 dataset 的文件名，不含扩展名)
+            # 生成配置名称：sf{scaling_factor}_{cluster_size}_{dataset_name_without_ext}
+            config_name = f"sf{int(scaling_factor)}_{cluster_size}_{dataset_name[:-4]}"
             experiment_name = f"{dataset_name[:-4]}_{cluster_size}"
+
             save_results(
                 results,
                 str(results_dir),
                 experiment_name,
+                config_name,
             )
 
 
@@ -596,6 +620,8 @@ def main():
                         help="Dataset file (e.g., data/tasks1.csv)")
     parser.add_argument("--cluster", type=str, default="small", choices=["small", "medium", "large"],
                         help="Cluster size")
+    parser.add_argument("--scaling-factor", type=float, default=40.0,
+                        help="GPU scaling factor (base scale for A30, default: 40.0)")
     parser.add_argument("--algorithms", type=str, nargs="+",
                         default=["FIFO", "Greedy", "SAGreedy"],
                         help="Algorithms to run")
@@ -616,7 +642,7 @@ def main():
 
     if args.full:
         setup_logging(results_dir)
-        run_full_experiments()
+        run_full_experiments(args.scaling_factor)
     else:
         # 处理数据集路径和名称
         dataset_path = args.dataset
@@ -628,6 +654,9 @@ def main():
         dataset_name = Path(dataset_path).stem  # 获取文件名不含扩展名
         experiment_name = f"{dataset_name}_{args.cluster}"
 
+        # 生成配置名称：sf{scaling_factor}_{cluster_size}_{dataset_name}
+        config_name = f"sf{int(args.scaling_factor)}_{args.cluster}_{dataset_name}"
+
         setup_logging(results_dir, experiment_name)
 
         # 构造完整的数据文件路径
@@ -637,12 +666,18 @@ def main():
             logging.info(f"Use 'python generate_tasks.py' to generate datasets.")
             return
 
-        results = run_experiment(str(data_path), args.cluster, args.algorithms)
+        results = run_experiment(
+            str(data_path),
+            args.cluster,
+            args.scaling_factor,
+            args.algorithms,
+        )
 
         save_results(
             results,
             str(Path(__file__).parent.parent / "results"),
             experiment_name,
+            config_name,
         )
 
 

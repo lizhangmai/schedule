@@ -24,15 +24,15 @@
     "gpu_average_memory_utilization": 0.2703609138328013
   },
   "SAGreedy": {
-    "weighted_completion_time": 3071968.095583212,
-    "average_completion_time": 1260.4928636202003,
-    "deadline_miss_count": 48.0,
-    "deadline_miss_rate": 0.048,
-    "weighted_tardiness": 329.3748933143717,
+    "weighted_completion_time": 3071992.185327167,
+    "average_completion_time": 1260.4905381507836,
+    "deadline_miss_count": 50.0,
+    "deadline_miss_rate": 0.05,
+    "weighted_tardiness": 374.1606827880562,
     "makespan": 2498.079473684211,
-    "gpu_time_utilization": 0.8061314170944495,
-    "gpu_average_concurrent_tasks": 0.8061314170944495,
+    "gpu_time_utilization": 0.8058548176946502,
+    "gpu_average_concurrent_tasks": 0.8058548176946502,
     "gpu_peak_memory_utilization": 0.6,
-    "gpu_average_memory_utilization": 0.2723664196328273
+    "gpu_average_memory_utilization": 0.2738326495306462
   }
 }

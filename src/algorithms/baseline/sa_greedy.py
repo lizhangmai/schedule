@@ -4,7 +4,7 @@
 策略：
 1. 以 Greedy 为搜索起点
 2. 整理所有拖期任务，优先安排一定比例的拖期任务
-   - 比例随温度下降：高温时优先安排较少的拖期任务，低温时优先安排较多
+   - 比例随温度下降：高温时优先安排较多拖期任务（更多探索），低温时优先安排较少（更多利用）
 3. 在优先安排的拖期任务基础上，用 Greedy 形式安排其他任务
 4. 计算评价指标 weighted_tardiness
 5. 即使评价指标较差，也有一定概率接受（退火概率）
@@ -12,8 +12,8 @@
 
 import math
 import random
-from copy import deepcopy
 from typing import List, Tuple, Optional, TYPE_CHECKING
+from tqdm import tqdm
 
 from ..base import BaseScheduler
 from ...models.task import Task
@@ -30,29 +30,32 @@ class SAGreedyScheduler(BaseScheduler):
     新策略：
     1. 以 Greedy 为搜索起点
     2. 整理所有拖期任务，优先安排一定比例的拖期任务
-       - 比例随温度下降：高温时优先安排较少的拖期任务，低温时优先安排较多
+       - 比例随温度下降：高温时优先安排较多拖期任务（更多探索），低温时优先安排较少（更多利用）
     3. 在优先安排的拖期任务基础上，用 Greedy 形式安排其他任务
     4. 计算评价指标 weighted_tardiness
     5. 即使评价指标较差，也有一定概率接受（退火概率）
 
     参数：
-    - initial_temp: 初始温度，默认 100
-    - cooling_rate: 降温系数，默认 0.99
-    - min_temp: 终止温度，默认 1
+    - initial_temp: 初始温度，默认 10000（需根据实际cost规模调整）
+    - cooling_rate: 降温系数，默认 0.995
+    - min_temp: 终止温度，默认 0.1
+    - max_iterations: 最大迭代次数，默认 10000
     """
 
     def __init__(
         self,
         cluster: Cluster,
-        initial_temp: float = 100.0,
-        cooling_rate: float = 0.99,
-        min_temp: float = 1
+        initial_temp: float = 1000.0,
+        cooling_rate: float = 0.8,
+        min_temp: float = 1,
+        max_iterations: int = 1000
     ):
         super().__init__()
         self.cluster = cluster
         self.initial_temp = initial_temp
         self.cooling_rate = cooling_rate
         self.min_temp = min_temp
+        self.max_iterations = max_iterations
 
     def schedule(self, tasks: List[Task]) -> List[Task]:
         """
@@ -88,7 +91,7 @@ class SAGreedyScheduler(BaseScheduler):
         新策略：
         1. 以 Greedy 为搜索起点
         2. 整理所有拖期任务，优先安排一定比例的拖期任务
-           - 比例随温度下降：高温时优先安排较少的拖期任务，低温时优先安排较多
+           - 比例随温度下降：高温时优先安排较多拖期任务（更多探索），低温时优先安排较少（更多利用）
         3. 在优先安排的拖期任务基础上，用 Greedy 形式安排其他任务
         4. 计算评价指标 weighted_tardiness
         5. 即使评价指标较差，也有一定概率接受（退火概率）
@@ -109,30 +112,40 @@ class SAGreedyScheduler(BaseScheduler):
 
         temp = self.initial_temp
 
-        while temp > self.min_temp:
-            # 2. 生成新解：优先安排拖期任务
-            new_order = self._generate_neighbor_with_tardy_priority(
-                current_order, current_completions, temp, self.initial_temp
-            )
+        # 使用迭代次数而非温度阈值来控制循环，确保足够的搜索
+        with tqdm(total=self.max_iterations, desc="模拟退火调度") as pbar:
+            for _ in range(self.max_iterations):
+                # 2. 生成新解：优先安排拖期任务
+                new_order = self._generate_neighbor_with_tardy_priority(
+                    current_order, current_completions, temp, self.initial_temp
+                )
 
-            # 3. 评估新解
-            new_cost, new_completions = self._evaluate_order(new_order)
+                # 3. 评估新解
+                new_cost, new_completions = self._evaluate_order(new_order)
 
-            # 5. 接受准则（即使评价指标较差，也有一定概率接受）
-            delta = new_cost - current_cost
-            if delta < 0 or random.random() < math.exp(-delta / temp):
-                # 接受新解
-                current_order = new_order
-                current_cost = new_cost
-                current_completions = new_completions
+                # 5. 接受准则（即使评价指标较差，也有一定概率接受）
+                delta = new_cost - current_cost
+                if delta < 0 or random.random() < math.exp(-delta / temp):
+                    # 接受新解
+                    current_order = new_order
+                    current_cost = new_cost
+                    current_completions = new_completions
 
-                # 更新最优解
-                if current_cost < best_cost:
-                    best_order = current_order.copy()
-                    best_cost = current_cost
+                    # 更新最优解
+                    if current_cost < best_cost:
+                        best_order = current_order.copy()
+                        best_cost = current_cost
 
-            # 降温
-            temp *= self.cooling_rate
+                # 降温
+                temp *= self.cooling_rate
+
+                # 更新进度条显示信息
+                pbar.set_postfix({
+                    '温度': f'{temp:.1f}',
+                    '当前cost': f'{current_cost:.1f}',
+                    '最优cost': f'{best_cost:.1f}'
+                })
+                pbar.update(1)
 
         return best_order
 
@@ -149,7 +162,7 @@ class SAGreedyScheduler(BaseScheduler):
         新策略：
         1. 找出所有拖期任务
         2. 根据温度计算优先安排的拖期任务比例
-           - 高温时比例低，低温时比例高
+           - 高温时比例高（更多探索），低温时比例低（更多利用）
         3. 将这些拖期任务提前到前面
         4. 其他任务按 arrival_time 排序（Greedy 方式）
 
@@ -219,15 +232,12 @@ class SAGreedyScheduler(BaseScheduler):
             # 按 arrival_time 排序
             other_sorted = sorted(other_tasks, key=lambda t: (t.arrival_time, t.task_id))
 
-        # 随机打乱优先拖期任务的内部顺序
-        random.shuffle(priority_sorted)
-
         new_order = priority_sorted + other_sorted
         return new_order
 
     def _evaluate_order(self, task_order: List[Task]) -> Tuple[float, dict[str, float]]:
         """
-        评估任务顺序的加权拖期（使用临时集群）
+        评估任务顺序的加权拖期（使用轻量级模拟，无需 deepcopy）
 
         Args:
             task_order: 任务顺序
@@ -235,30 +245,68 @@ class SAGreedyScheduler(BaseScheduler):
         Returns:
             (加权拖期总和, 任务ID -> 完成时间 的映射)
         """
-        # 创建临时集群，避免污染实际集群状态
-        temp_cluster = deepcopy(self.cluster)
-
         total_weighted_tardiness = 0.0
         completions = {}  # 任务ID -> 完成时间
 
+        # 轻量级跟踪：为每个GPU维护时间占用列表
+        gpu_schedules = {gpu.gpu_id: [] for gpu in self.cluster.gpus}
+
         for task in task_order:
-            gpu, start_time = self._find_best_gpu(temp_cluster, task)
-            if gpu is not None:
+            best_gpu_id = None
+            best_start_time = float('inf')
+            best_completion_time = float('inf')
+
+            # 找到能容纳该任务的GPU中最早的完成时间
+            for gpu in self.cluster.gpus:
+                if not gpu.can_accommodate(task):
+                    continue
+
+                # 找到最早的可用开始时间
+                schedule = gpu_schedules[gpu.gpu_id]
+                start_time = task.arrival_time
                 execution_time = task.get_execution_time(gpu)
+
+                # 收集候选开始时间点（到达时间 + 所有任务结束时间）
+                candidate_times = [start_time]
+                for s_start, s_end, _ in schedule:
+                    if s_end >= start_time:
+                        candidate_times.append(s_end)
+
+                # 尝试每个候选时间，找到第一个不冲突的
+                for candidate in candidate_times:
+                    test_start = max(candidate, start_time)
+                    test_end = test_start + execution_time
+
+                    # 检查是否与所有已调度任务冲突
+                    has_conflict = False
+                    for s_start, s_end, _ in schedule:
+                        # 冲突条件：时间段重叠
+                        if not (test_end <= s_start or test_start >= s_end):
+                            has_conflict = True
+                            break
+
+                    if not has_conflict:
+                        start_time = test_start
+                        break
+
                 completion_time = start_time + execution_time
 
-                # 模拟添加任务到时间线，并保持有序
-                gpu.timeline.append((start_time, completion_time, task))
-                gpu.timeline.sort(key=lambda x: x[0])
+                if completion_time < best_completion_time:
+                    best_completion_time = completion_time
+                    best_start_time = start_time
+                    best_gpu_id = gpu.gpu_id
 
-                # 记录完成时间
-                completions[task.task_id] = completion_time
+            # 记录最佳调度
+            if best_gpu_id is not None:
+                gpu_schedules[best_gpu_id].append((best_start_time, best_completion_time, task))
+                gpu_schedules[best_gpu_id].sort(key=lambda x: x[0])  # 保持有序以便后续查找
+                completions[task.task_id] = best_completion_time
 
                 # 计算加权拖期
-                tardiness = max(0.0, completion_time - task.deadline)
+                tardiness = max(0.0, best_completion_time - task.deadline)
                 total_weighted_tardiness += task.weight * tardiness
             else:
-                # 任务无法调度，设为无穷大
+                # 任务无法调度
                 completions[task.task_id] = float('inf')
 
         return total_weighted_tardiness, completions
