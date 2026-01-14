@@ -1,50 +1,38 @@
 {
   "FIFO": {
-    "weighted_completion_time": 3081640.291834993,
-    "average_completion_time": 1264.3374708463728,
-    "deadline_miss_count": 127.0,
-    "deadline_miss_rate": 0.127,
-    "weighted_tardiness": 1461.684295874853,
+    "weighted_completion_time": 3071180.1426813602,
+    "average_completion_time": 1260.1459892958746,
+    "deadline_miss_count": 57.0,
+    "deadline_miss_rate": 0.057,
+    "weighted_tardiness": 523.9704409672795,
     "makespan": 2503.4,
     "gpu_time_utilization": 0.855855846385568,
     "gpu_average_concurrent_tasks": 0.855855846385568,
     "gpu_peak_memory_utilization": 0.6,
     "gpu_average_memory_utilization": 0.32118150258433426
   },
-  "SPT": {
-    "weighted_completion_time": 3081640.291834993,
-    "average_completion_time": 1264.3374708463728,
-    "deadline_miss_count": 127.0,
-    "deadline_miss_rate": 0.127,
-    "weighted_tardiness": 1461.684295874853,
-    "makespan": 2988.8705405405403,
-    "gpu_time_utilization": 0.7147275416944016,
-    "gpu_average_concurrent_tasks": 0.7147275416944016,
+  "Greedy": {
+    "weighted_completion_time": 3071718.1945945923,
+    "average_completion_time": 1260.371210106687,
+    "deadline_miss_count": 52.0,
+    "deadline_miss_rate": 0.052,
+    "weighted_tardiness": 502.9900284495056,
+    "makespan": 2498.079473684211,
+    "gpu_time_utilization": 0.8035542357593127,
+    "gpu_average_concurrent_tasks": 0.8035542357593127,
     "gpu_peak_memory_utilization": 0.6,
-    "gpu_average_memory_utilization": 0.274968803336385
+    "gpu_average_memory_utilization": 0.2703609138328013
   },
-  "EDF": {
-    "weighted_completion_time": 3081640.2918349933,
-    "average_completion_time": 1264.337470846373,
-    "deadline_miss_count": 127.0,
-    "deadline_miss_rate": 0.127,
-    "weighted_tardiness": 1461.684295874853,
-    "makespan": 2502.3243243243246,
-    "gpu_time_utilization": 0.8497827529530629,
-    "gpu_average_concurrent_tasks": 0.8497827529530629,
+  "SAGreedy": {
+    "weighted_completion_time": 3071968.095583212,
+    "average_completion_time": 1260.4928636202003,
+    "deadline_miss_count": 48.0,
+    "deadline_miss_rate": 0.048,
+    "weighted_tardiness": 329.3748933143717,
+    "makespan": 2498.079473684211,
+    "gpu_time_utilization": 0.8061314170944495,
+    "gpu_average_concurrent_tasks": 0.8061314170944495,
     "gpu_peak_memory_utilization": 0.6,
-    "gpu_average_memory_utilization": 0.32483338293949693
-  },
-  "MultiObjective": {
-    "weighted_completion_time": 3081640.291834993,
-    "average_completion_time": 1264.3374708463728,
-    "deadline_miss_count": 127.0,
-    "deadline_miss_rate": 0.127,
-    "weighted_tardiness": 1461.684295874853,
-    "makespan": 2506.267894736843,
-    "gpu_time_utilization": 0.791420080771263,
-    "gpu_average_concurrent_tasks": 0.791420080771263,
-    "gpu_peak_memory_utilization": 0.6,
-    "gpu_average_memory_utilization": 0.256424748274091
+    "gpu_average_memory_utilization": 0.2723664196328273
   }
 }

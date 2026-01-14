@@ -11,7 +11,7 @@
 
 ## 特性
 
-- 支持多种调度算法（FIFO、SPT、EDF、多目标优化）
+- 支持 FIFO 调度算法
 - 事件驱动的仿真引擎
 - 完整的性能评估指标
 - 可视化结果对比
@@ -34,7 +34,6 @@ pip install -r requirements.txt
 from src.models.cluster import create_small_cluster
 from src.utils.data_loader import load_tasks_from_csv
 from src.algorithms.baseline.fifo_scheduler import FIFOScheduler
-from src.algorithms.heuristic.multi_objective_scheduler import MultiObjectiveScheduler
 from src.metrics.calculator import MetricsCalculator
 
 # 加载任务数据
@@ -44,7 +43,7 @@ tasks = load_tasks_from_csv('data/tasks1.csv')
 cluster = create_small_cluster()
 
 # 运行调度算法
-scheduler = MultiObjectiveScheduler(cluster)
+scheduler = FIFOScheduler(cluster)
 scheduled_tasks = scheduler.schedule(tasks)
 
 # 计算评估指标
@@ -82,25 +81,6 @@ print(f"GPU Average Memory Utilization: {metrics.gpu_average_memory_utilization:
 ### 基线算法
 
 - **FIFO**：按任务到达时间顺序调度
-- **SPT**：最短处理时间优先
-- **EDF**：最早截止时间优先
-
-### 多目标优化调度器（核心算法）
-
-综合评分函数：
-
-```
-Score = α·Urgency + β·Efficiency + γ·MemoryFit + δ·Utilization
-```
-
-| 维度 | 说明 |
-|------|------|
-| Urgency | 时间紧急度，deadline 越近分数越高 |
-| Efficiency | 执行效率，GPU 越强、时间越短分数越高 |
-| MemoryFit | 显存适配度，接近 GPU 容量一半时最优 |
-| Utilization | 资源利用率，优先利用空闲 GPU |
-
-**复杂度**：O(n² × m)
 
 ## 运行实验
 
@@ -117,9 +97,6 @@ python experiments/run_comparison.py --dataset data/tasks1.csv --cluster small
 
 # 运行完整实验矩阵（自动扫描 data/ 目录所有数据集）
 python experiments/run_comparison.py --full
-
-# 指定算法
-python experiments/run_comparison.py --dataset data/tasks1.csv --algorithms FIFO MultiObjective
 ```
 
 ### 负载级别说明
@@ -177,12 +154,8 @@ schedule/
 │   │   └── cluster.py             # Cluster 类
 │   ├── algorithms/
 │   │   ├── base.py                # 调度器基类
-│   │   ├── baseline/              # 基线算法
-│   │   │   ├── fifo_scheduler.py
-│   │   │   ├── spt_scheduler.py
-│   │   │   └── edf_scheduler.py
-│   │   └── heuristic/             # 启发式算法
-│   │       └── multi_objective_scheduler.py
+│   │   └── baseline/              # 基线算法
+│   │       └── fifo_scheduler.py
 │   ├── simulation/                # 仿真引擎
 │   │   └── simulator.py
 │   ├── metrics/                   # 评估指标

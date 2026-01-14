@@ -139,6 +139,9 @@ class GPU:
         task.start_time = start_time
         task.completion_time = completion_time
 
+        # 保持 timeline 按 start_time 有序
+        self.timeline.sort(key=lambda x: x[0])
+
     def get_completion_time(self, task: "Task", start_time: float) -> float:
         """
         计算任务完成时间

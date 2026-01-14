@@ -155,7 +155,7 @@ class PlotGenerator:
         cluster: Cluster,
         save_path: Optional[str] = None,
         show: bool = True,
-        max_tasks: int = 50,
+        max_tasks: Optional[int] = 50,
     ) -> None:
         """
         绘制调度甘特图
@@ -165,7 +165,7 @@ class PlotGenerator:
             cluster: GPU 集群
             save_path: 保存路径
             show: 是否显示图表
-            max_tasks: 最大显示任务数
+            max_tasks: 最大显示任务数，None 表示显示全部任务
         """
         fig, ax = plt.subplots(figsize=(14, 8))
 
@@ -174,7 +174,11 @@ class PlotGenerator:
         for gpu in cluster.gpus:
             gpu_tasks[gpu.gpu_id] = []
 
-        scheduled_tasks = [t for t in result.tasks if t.is_scheduled()][:max_tasks]
+        # max_tasks=None 时显示全部任务
+        if max_tasks is None:
+            scheduled_tasks = [t for t in result.tasks if t.is_scheduled()]
+        else:
+            scheduled_tasks = [t for t in result.tasks if t.is_scheduled()][:max_tasks]
 
         for task in scheduled_tasks:
             if task.assigned_gpu:
@@ -219,7 +223,9 @@ class PlotGenerator:
         ax.set_yticklabels(gpu_labels)
         ax.set_xlabel("Time")
         ax.set_ylabel("GPU")
-        ax.set_title(f"Schedule Gantt Chart (showing first {min(max_tasks, len(scheduled_tasks))} tasks)")
+        # max_tasks=None 时显示 "all tasks"，否则显示数量
+        task_count_str = "all" if max_tasks is None else str(min(max_tasks, len([t for t in result.tasks if t.is_scheduled()])))
+        ax.set_title(f"Schedule Gantt Chart (showing {task_count_str} tasks)")
 
         # 添加图例
         from matplotlib.patches import Patch
