@@ -1,0 +1,288 @@
+\documentclass[lettersize,journal]{IEEEtran}
+\usepackage{amsmath,amsfonts}
+\usepackage{algorithmic}
+\usepackage{array}
+\usepackage[caption=false,font=normalsize,labelfont=sf,textfont=sf]{subfig}
+\usepackage{textcomp}
+\usepackage{stfloats}
+\usepackage{url}
+\usepackage{verbatim}
+\usepackage{graphicx}
+
+\usepackage{algorithm} % 需要添加这个包来支持 algorithm 环境
+\usepackage{algorithmic}
+
+\hyphenation{op-tical net-works semi-conduc-tor IEEE-Xplore}
+\def\BibTeX{{\rm B\kern-.05em{\sc i\kern-.025em b}\kern-.08em
+    T\kern-.1667em\lower.7ex\hbox{E}\kern-.125emX}}
+\usepackage{balance}
+\begin{document}
+\title{Heterogeneous GPU Scheduling}
+% \author{IEEE Publication Technology Department
+
+
+\maketitle
+
+\section{Formal Problem Description: Simplified Heterogeneous GPU Scheduling}
+
+\subsection{Sets and Indices}
+\begin{itemize}
+    \item $\mathcal{T} = \{1, 2, \dots, n\}$: Set of tasks .
+    \item $\mathcal{G} = \{1, 2, \dots, m\}$: Set of available GPUs in the cluster.
+    \item $i, k \in \mathcal{T}$: Indices for tasks.
+    \item $j \in \mathcal{G}$: Index for GPUs.
+\end{itemize}
+
+\subsection{Parameters}
+\textbf{Task Model (from Dataset):}
+\begin{itemize}
+    \item $L_i$: Workload of task $i$ (Floating point operations or relative units).
+    \item $m_i$: Memory demand of task $i$ (GB).
+    \item $d_i$: Deadline of task $i$ (Time unit).
+    \item $w_i$: Weight/Priority of task $i$.
+    \item $a_i$: Arrival time of task $i$.
+\end{itemize}
+
+\textbf{Resource Model (GPU Cluster):}
+\begin{itemize}
+    \item $v_j$: Computing speed of GPU $j$ (Workload per time unit).
+    \item $M_j$: Memory capacity of GPU $j$ (GB).
+\end{itemize}
+
+\textbf{Derived Parameter:}
+\begin{itemize}
+    \item $p_{ij} = \frac{L_i}{v_j}$: Execution time of task $i$ if assigned to GPU $j$.
+\end{itemize}
+
+\subsection{Decision Variables}
+\begin{itemize}
+    \item $x_{ij} \in \{0, 1\}$: Binary variable. equals 1 if task $i$ is assigned to GPU $j$, 0 otherwise.
+    \item $s_i \ge 0$: Start time of task $i$.
+    \item $c_i \ge 0$: Completion time of task $i$.
+    \item $y_{ik} \in \{0, 1\}$: Binary sequence variable (for tasks on the same GPU). Equals 1 if task $i$ precedes task $k$, 0 otherwise.
+\end{itemize}
+
+\subsection{Mathematical Formulation}
+
+\paragraph{\textbf{Objective Function}}
+Minimize the Total Weighted Tardiness. This balances the priority ($w_i$) and the urgency (meeting $d_i$).
+\begin{equation}
+    \text{Minimize } Z = \sum_{i \in \mathcal{T}} w_i \cdot \max(0, c_i - d_i)
+\end{equation}
+
+\paragraph{Constraints}
+
+1. Assignment Constraint:
+Each task must be assigned to exactly one GPU.
+\begin{equation}
+    \sum_{j \in \mathcal{G}} x_{ij} = 1, \quad \forall i \in \mathcal{T}
+\end{equation}
+
+2. Memory Constraint:
+A task can only be assigned to a GPU if the GPU's memory capacity is sufficient.
+\begin{equation}
+    x_{ij} \cdot m_i \le M_j, \quad \forall i \in \mathcal{T}, \forall j \in \mathcal{G}
+\end{equation}
+
+3. Timing Constraints:
+The completion time is the start time plus the execution time on the assigned GPU.
+\begin{equation}
+    c_i = s_i + \sum_{j \in \mathcal{G}} x_{ij} p_{ij}, \quad \forall i \in \mathcal{T}
+\end{equation}
+A task cannot start before its arrival time.
+\begin{equation}
+    s_i \ge a_i, \quad \forall i \in \mathcal{T}
+\end{equation}
+
+4. Non-overlapping Constraint (Disjunctive):
+If two tasks $i$ and $k$ are assigned to the same GPU, they cannot overlap in time. ($H$ is a sufficiently large positive number).
+\begin{equation}
+\begin{aligned}
+    s_i + \sum_{j \in \mathcal{G}} x_{ij} p_{ij} &\le s_k + H(3 - x_{ij} - x_{kj} - y_{ik}) \\
+    s_k + \sum_{j \in \mathcal{G}} x_{kj} p_{kj} &\le s_i + H(3 - x_{ij} - x_{kj} - (1-y_{ik}))
+\end{aligned}
+\end{equation}
+This ensures that if both are on GPU $j$, either $i$ finishes before $k$ starts or $k$ finishes before $i$ starts.
+
+\subsection{Performance Metrics}
+
+Based on the decision variables and parameters defined above, the following metrics are used to evaluate the scheduling performance:
+
+\subsubsection{Total Weighted Completion Time (TWCT)}
+This metric represents the overall value-weighted responsiveness of the system. Lower is better.
+\begin{equation}
+    \text{TWCT} = \sum_{i \in \mathcal{T}} w_i \cdot (c_i - a_i)
+\end{equation}
+% \textit{Note: If the focus is on the duration from arrival, Weighted Turnaround Time ($\sum w_i (C_i - a_i)$) can also be used.}
+
+\subsubsection{Average Completion Time (ACT)}
+The average time at which tasks finish execution. Lower is better.
+\begin{equation}
+    \text{ACT} = \frac{1}{n} \sum_{i \in \mathcal{T}} (c_i - a_i)
+\end{equation}
+% \textit{Alternatively, Average Turnaround Time (ATT) describes the average time a task spends in the system:}
+% \begin{equation}
+%     \text{ATT} = \frac{1}{n} \sum_{i \in \mathcal{T}} (C_i - a_i)
+% \end{equation}
+
+\subsubsection{Deadline Miss Count (DMC)}
+The total number of tasks that failed to complete before their deadline. Lower is better.
+Let $\mathbb{I}(\cdot)$ be an indicator function that equals 1 if the condition is true, and 0 otherwise.
+\begin{equation}
+    \text{DMC} = \sum_{i \in \mathcal{T}} \mathbb{I}(C_i > d_i)
+\end{equation}
+
+\subsubsection{Deadline Miss Rate (DMR)}
+The proportion of tasks that failed to complete before their deadline. Lower is better.
+\begin{equation}
+    \text{DMR} = \frac{1}{n} \sum_{i \in \mathcal{T}} \mathbb{I}(C_i > d_i)
+\end{equation}
+
+\subsubsection{Average GPU Utilization ($\eta$)}
+The ratio of the total effective processing time to the total active time of the cluster. Higher is better.
+First, we define the \textbf{Makespan} ($C_{\max}$), which is the completion time of the last task in the system:
+\begin{equation}
+    C_{\max} = \max_{i \in \mathcal{T}} (C_i)
+\end{equation}
+The utilization is calculated as:
+\begin{equation}
+    \eta = \frac{\sum_{i \in \mathcal{T}} \sum_{j \in \mathcal{G}} x_{ij} \cdot p_{ij}}{m \cdot (C_{\max} - \min_{k \in \mathcal{T}} a_k)}
+\end{equation}
+Where $m$ is the total number of GPUs, and the denominator represents the total GPU-time available during the active scheduling window.
+
+\section{Complexity Analysis}
+
+% To justify the necessity of employing heuristic or meta-heuristic algorithms (e.g., Genetic Algorithms, Reinforcement Learning) rather than exact methods for large-scale instances (such as the 20,000 tasks in our dataset), we analyze the computational complexity of the proposed Heterogeneous GPU Scheduling Problem (HGSP).
+
+% \begin{theorem}
+The Heterogeneous GPU Scheduling Problem (HGSP) with the objective of minimizing Total Weighted Tardiness is $\mathcal{NP}$-hard.
+% \end{theorem}
+
+% \begin{proof_sketch}
+We prove the $\mathcal{NP}$-hardness of the HGSP by \textbf{restriction}. We show that a special case of our general problem reduces to the \textit{Single Machine Total Weighted Tardiness Problem} ($1 || \sum w_j T_j$), which is a known $\mathcal{NP}$-hard problem.
+
+Consider a restricted instance of the HGSP with the following constraints:
+\begin{enumerate}
+    \item \textbf{Single GPU:} The cluster consists of only one GPU ($m=1$).
+    \item \textbf{Infinite Memory:} The memory capacity of the GPU is sufficiently large ($M_1 \to \infty$), or task memory demands are zero ($m_i = 0$), effectively removing the memory constraint.
+    \item \textbf{Simultaneous Arrival:} All tasks arrive at time zero ($a_i = 0, \forall i \in \mathcal{T}$).
+    \item \textbf{Homogeneous Processing:} Since there is only one GPU, the processing time $p_{ij}$ simplifies to a fixed processing time $p_i$ for each task.
+\end{enumerate}
+
+Under these restrictions, the decision variables reduce to finding a permutation (sequence) of tasks. The objective function remains:
+\begin{equation}
+    \text{Minimize } \sum_{i \in \mathcal{T}} w_i \cdot \max(0, C_i - d_i)
+\end{equation}
+where $C_i$ is determined solely by the sum of processing times of tasks preceding $i$ in the sequence plus $p_i$.
+
+This restricted problem is exactly the \textbf{Single Machine Total Weighted Tardiness Problem}, denoted as $1 || \sum w_j T_j$ in Graham's notation.
+It has been proven by Lawler (1977) and Lenstra et al. (1977) that $1 || \sum w_j T_j$ is $\mathcal{NP}$-hard in the strong sense.
+
+Since a special case of the HGSP is $\mathcal{NP}$-hard, the general HGSP (which adds multiple heterogeneous machines, memory constraints, and release times) is at least as hard as this special case. Therefore, the HGSP is $\mathcal{NP}$-hard.
+% \end{proof_sketch}
+
+% Lawler, E. L. (1973).
+% Optimal sequencing of a single machine subject to precedence constraints.
+% Management Science, 19(5), 544–546.
+
+% Lenstra, J. K., Rinnooy Kan, A. H. G., & Brucker, P. (1977).
+% Complexity of machine scheduling problems.
+% Annals of Discrete Mathematics, 1, 343–362.
+
+\section{Algorithm Design}
+
+Given the online nature of the problem, where tasks arrive dynamically ($a_i$) and full knowledge of future workloads is unavailable, we adopt a dynamic scheduling approach. The scheduler processes tasks based on their arrival order and assigns them to the heterogeneous GPU cluster using different strategies.
+
+We propose three algorithms to schedule tasks to the Heterogeneous GPU cluster: a baseline First-In-First-Out (FIFO) approach, an improved Greedy strategy, and a meta-heuristic Simulated Annealing with Greedy assignment (SAGreedy) algorithm.
+
+\subsection{Baseline Method: FIFO}
+
+The First-In-First-Out (FIFO) scheduler serves as a simple baseline that processes tasks strictly in their arrival order. This approach is straightforward and provides a reference for comparing more sophisticated algorithms.
+
+\subsubsection{Algorithm Logic}
+At any scheduling decision point:
+\begin{enumerate}
+    \item \textbf{Sort}: Sort all tasks in ascending order of their arrival times $a_i$.
+    \item \textbf{Assign}: For each task $i$ in order:
+    \begin{itemize}
+        \item Identify the set of valid GPUs $\mathcal{G}_{valid} = \{j \in \mathcal{G} \mid M_j \ge m_i\}$.
+        \item If $\mathcal{G}_{valid} = \emptyset$, skip the task (resource unavailable).
+        \item Otherwise, assign task $i$ to the GPU $j^* \in \mathcal{G}_{valid}$ that minimizes the start time.
+    \end{itemize}
+\end{enumerate}
+
+The start time on GPU $j$ is calculated as $s_{ij} = \max(a_i, \text{avail}_j)$, where $\text{avail}_j$ is the time GPU $j$ finishes its currently assigned tasks. The completion time is $c_{ij} = s_{ij} + \frac{L_i}{v_j}$.
+
+\subsubsection{Complexity Analysis}
+Let $N$ be the number of tasks and $M$ be the number of GPUs. The complexity is $O(N \log N + N \cdot M)$ for sorting and GPU assignment.
+
+\subsection{Improved Heuristic: Greedy (EFT)}
+
+The Greedy scheduler improves upon FIFO by considering both arrival time and GPU heterogeneity when making scheduling decisions. It uses an Earliest Finish Time (EFT) strategy that accounts for GPU computing speeds.
+
+\subsubsection{Algorithm Logic}
+At any scheduling decision point:
+\begin{enumerate}
+    \item \textbf{Sort}: Sort all tasks in ascending order of their arrival times $a_i$.
+    \item \textbf{Assign}: For each task $i$ in order:
+    \begin{itemize}
+        \item Identify the set of valid GPUs $\mathcal{G}_{valid} = \{j \in \mathcal{G} \mid M_j \ge m_i\}$.
+        \item If $\mathcal{G}_{valid} = \emptyset$, skip the task.
+        \item Otherwise, assign task $i$ to the GPU $j^* \in \mathcal{G}_{valid}$ that minimizes the completion time $c_{ij} = \max(a_i, \text{avail}_j) + \frac{L_i}{v_j}$.
+    \end{itemize}
+\end{enumerate}
+
+\textbf{Key Difference from FIFO}: While FIFO selects the GPU with the earliest start time, Greedy considers the execution time on different GPUs (varying $v_j$) and selects the GPU that minimizes the actual completion time.
+
+\subsubsection{Complexity Analysis}
+The complexity remains $O(N \log N + N \cdot M)$, but the EFT strategy better exploits GPU heterogeneity for improved performance.
+
+\subsection{Meta-Heuristic: SAGreedy}
+
+To address the NP-Hardness of minimizing Total Weighted Tardiness (as proven in Section II), we propose a Simulated Annealing with Greedy GPU assignment (SAGreedy) algorithm. This meta-heuristic explores the global solution space of task permutations while using efficient greedy GPU assignment for evaluation.
+
+\subsubsection{Algorithm Overview}
+\begin{enumerate}
+    \item \textbf{Initialization}: Start with the Greedy solution as the initial state.
+    \item \textbf{Temperature Schedule}: Use exponential cooling $T_{k+1} = \alpha \cdot T_k$ where $\alpha \in (0, 1)$.
+    \item \textbf{Neighbor Generation}: Generate new task ordering by prioritizing tardy tasks based on current temperature.
+    \item \textbf{Acceptance Criterion}: Accept worse solutions with probability $e^{-\Delta/T}$ to escape local optima.
+    \item \textbf{GPU Assignment}: For each task ordering, use greedy GPU assignment (EFT) for evaluation.
+\end{enumerate}
+
+\subsubsection{Fitness Function}
+The fitness function corresponds directly to the minimization objective defined in Eq. (1). For a given task ordering with greedy GPU assignment, the fitness value (to be minimized) is:
+\begin{equation}
+    Fitness = \sum_{i \in \mathcal{T}} w_i \cdot \max(0, c_i - d_i)
+\end{equation}
+
+\subsubsection{Priority-Based Neighbor Generation}
+A key innovation in SAGreedy is the temperature-dependent neighbor generation strategy:
+\begin{itemize}
+    \item \textbf{High Temperature}: Prioritize a larger fraction of tardy tasks, enabling more exploration.
+    \item \textbf{Low Temperature}: Prioritize fewer tardy tasks, focusing on exploitation of good solutions.
+\end{itemize}
+
+Let $\tau$ be the set of tardy tasks (where $c_i > d_i$). The priority ratio $\rho \in [0.1, 0.8]$ is calculated as:
+\begin{equation}
+    \rho = \min(0.8, \max(0.1, \frac{T - T_{min}}{T_{initial} - T_{min}}))
+\end{equation}
+
+The top $\rho \cdot |\tau|$ tardy tasks are selected and prioritized in the new ordering, while remaining tasks follow arrival-time ordering.
+
+\subsubsection{Complexity Analysis}
+Let $N$ be the number of tasks, $M$ be the number of GPUs, $K$ be the maximum iterations, and $T_{initial}$ be the initial temperature.
+\begin{itemize}
+    \item \textbf{Fitness Evaluation}: For each candidate solution, greedy assignment involves $O(N \cdot M)$ operations.
+    \item \textbf{Total Complexity}: $O(K \cdot N \cdot M)$ for the complete annealing process.
+\end{itemize}
+
+Although computationally more expensive than FIFO and Greedy ($O(N \log N + N \cdot M)$), SAGreedy allows for escaping local optima by explicitly considering weighted tardiness in the optimization objective.
+
+
+
+
+
+\end{document}
+
+
