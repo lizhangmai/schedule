@@ -82,10 +82,10 @@ logs/
 
 # Results and outputs
 # results/
-*.png
-*.jpg
-*.jpeg
-*.pdf
+# *.png
+# *.jpg
+# *.jpeg
+# *.pdf
 
 # Data files (optional - uncomment if you don't want to track generated data)
 # data/tasks*.csv
@@ -93,3 +93,10 @@ logs/
 # OS
 .DS_Store
 Thumbs.db
+
+
+
+# cy 
+latex_prj/*
+!latex_prj/*.tex
+!latex_prj/*.pdf

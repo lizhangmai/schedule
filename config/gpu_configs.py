@@ -10,19 +10,18 @@ from typing import Dict, List
 # 2. 任务时间要求 - 让单个 GPU 无法独立完成所有任务，必须多 GPU 协作
 DEFAULT_BASE_SCALE = 30
 
-GPU_CONFIGS: Dict[str, Dict[str, int | float]] = {
-    "A100": {
-        "memory_capacity": 80,  # GB
-        "scaling_factor": DEFAULT_BASE_SCALE * 1.9,  # ≈ 30 × 1.9 (A100 约为 A30 的 1.9 倍)
-    },
-    "A30": {
-        "memory_capacity": 24,  # GB
-        "scaling_factor": DEFAULT_BASE_SCALE,  # 基准值，99.9% 的任务可按时完成
-    },
-    "L40": {
-        "memory_capacity": 48,  # GB
-        "scaling_factor": DEFAULT_BASE_SCALE * 1.85,  # ≈ 30 × 1.85 (L40 约为 A30 的 1.85 倍)
-    },
+# GPU 相对性能因子（相对于 A30 的倍数）
+GPU_SCALING_RATIOS = {
+    "A100": 1.9,
+    "A30": 1.0,
+    "L40": 1.85,
+}
+
+# GPU 显存容量（GB）
+GPU_MEMORY_CAPACITIES = {
+    "A100": 80,
+    "A30": 24,
+    "L40": 48,
 }
 
 
@@ -37,19 +36,43 @@ def get_gpu_configs_with_scale(base_scale: float = DEFAULT_BASE_SCALE) -> Dict[s
         GPU 配置字典
     """
     return {
-        "A100": {
-            "memory_capacity": 80,
-            "scaling_factor": base_scale * 1.9,
-        },
-        "A30": {
-            "memory_capacity": 24,
-            "scaling_factor": base_scale,
-        },
-        "L40": {
-            "memory_capacity": 48,
-            "scaling_factor": base_scale * 1.85,
-        },
+        model: {
+            "memory_capacity": GPU_MEMORY_CAPACITIES[model],
+            "scaling_factor": base_scale * GPU_SCALING_RATIOS[model],
+        }
+        for model in GPU_SCALING_RATIOS
     }
+
+
+def _create_gpu_configs_list(gpu_configs: Dict[str, Dict], size: str) -> List[Dict]:
+    """
+    根据集群规模创建 GPU 配置列表
+
+    Args:
+        gpu_configs: GPU 配置字典
+        size: 集群规模 (small/medium/large)
+
+    Returns:
+        GPU 配置列表
+    """
+    size_counts = {
+        "small": 1,
+        "medium": 2,
+        "large": 3,
+    }
+
+    count = size_counts.get(size, 1)
+    configs = []
+
+    for model in ["A100", "A30", "L40"]:
+        for i in range(1, count + 1):
+            configs.append({
+                "gpu_id": f"{model}-{i}",
+                "model": model,
+                **gpu_configs[model],
+            })
+
+    return configs
 
 
 def get_cluster_config(size: str, base_scale: float = DEFAULT_BASE_SCALE) -> List[Dict]:
@@ -64,58 +87,14 @@ def get_cluster_config(size: str, base_scale: float = DEFAULT_BASE_SCALE) -> Lis
         GPU 配置列表
     """
     gpu_configs = get_gpu_configs_with_scale(base_scale)
+    return _create_gpu_configs_list(gpu_configs, size)
 
-    configs = {
-        "small": [
-            {"gpu_id": "A100-1", "model": "A100", **gpu_configs["A100"]},
-            {"gpu_id": "A30-1", "model": "A30", **gpu_configs["A30"]},
-            {"gpu_id": "L40-1", "model": "L40", **gpu_configs["L40"]},
-        ],
-        "medium": [
-            {"gpu_id": "A100-1", "model": "A100", **gpu_configs["A100"]},
-            {"gpu_id": "A100-2", "model": "A100", **gpu_configs["A100"]},
-            {"gpu_id": "A30-1", "model": "A30", **gpu_configs["A30"]},
-            {"gpu_id": "A30-2", "model": "A30", **gpu_configs["A30"]},
-            {"gpu_id": "L40-1", "model": "L40", **gpu_configs["L40"]},
-            {"gpu_id": "L40-2", "model": "L40", **gpu_configs["L40"]},
-        ],
-        "large": [
-            {"gpu_id": f"A100-{i}", "model": "A100", **gpu_configs["A100"]} for i in range(1, 4)
-        ]
-        + [
-            {"gpu_id": f"A30-{i}", "model": "A30", **gpu_configs["A30"]} for i in range(1, 4)
-        ]
-        + [
-            {"gpu_id": f"L40-{i}", "model": "L40", **gpu_configs["L40"]} for i in range(1, 4)
-        ],
-    }
 
-    return configs.get(size, configs["small"])
-
-# 集群配置（不同规模）
+# 集群配置（不同规模）- 使用默认缩放因子
+GPU_CONFIGS = get_gpu_configs_with_scale(DEFAULT_BASE_SCALE)
 CLUSTER_CONFIGS: Dict[str, List[Dict]] = {
-    "small": [
-        {"gpu_id": "A100-1", "model": "A100", **GPU_CONFIGS["A100"]},
-        {"gpu_id": "A30-1", "model": "A30", **GPU_CONFIGS["A30"]},
-        {"gpu_id": "L40-1", "model": "L40", **GPU_CONFIGS["L40"]},
-    ],
-    "medium": [
-        {"gpu_id": "A100-1", "model": "A100", **GPU_CONFIGS["A100"]},
-        {"gpu_id": "A100-2", "model": "A100", **GPU_CONFIGS["A100"]},
-        {"gpu_id": "A30-1", "model": "A30", **GPU_CONFIGS["A30"]},
-        {"gpu_id": "A30-2", "model": "A30", **GPU_CONFIGS["A30"]},
-        {"gpu_id": "L40-1", "model": "L40", **GPU_CONFIGS["L40"]},
-        {"gpu_id": "L40-2", "model": "L40", **GPU_CONFIGS["L40"]},
-    ],
-    "large": [
-        {"gpu_id": f"A100-{i}", "model": "A100", **GPU_CONFIGS["A100"]} for i in range(1, 4)
-    ]
-    + [
-        {"gpu_id": f"A30-{i}", "model": "A30", **GPU_CONFIGS["A30"]} for i in range(1, 4)
-    ]
-    + [
-        {"gpu_id": f"L40-{i}", "model": "L40", **GPU_CONFIGS["L40"]} for i in range(1, 4)
-    ],
+    size: _create_gpu_configs_list(GPU_CONFIGS, size)
+    for size in ["small", "medium", "large"]
 }
 
 

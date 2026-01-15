@@ -208,15 +208,16 @@ class PlotGenerator:
                         color=color,
                         alpha=0.7,
                     )
-                    # 添加任务标签
-                    ax.text(
-                        task.start_time + duration / 2,
-                        y_pos,
-                        task.task_id,
-                        ha="center",
-                        va="center",
-                        fontsize=7,
-                    )
+                    # 仅在显示部分任务时添加任务标签（全部任务时太密集）
+                    if max_tasks is not None:
+                        ax.text(
+                            task.start_time + duration / 2,
+                            y_pos,
+                            task.task_id,
+                            ha="center",
+                            va="center",
+                            fontsize=7,
+                        )
             y_pos += 1
 
         ax.set_yticks(list(y_positions.values()))

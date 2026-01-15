@@ -12,6 +12,7 @@
 
 import math
 import random
+from enum import Enum
 from typing import List, Tuple, Optional, TYPE_CHECKING
 from tqdm import tqdm
 
@@ -21,6 +22,14 @@ from ...models.cluster import Cluster
 
 if TYPE_CHECKING:
     from ...models.gpu import GPU
+
+
+class SortingStrategy(Enum):
+    """任务排序策略"""
+    BY_TARDINESS = "tardiness"
+    BY_ARRIVAL = "arrival"
+    BY_DEADLINE = "deadline"
+    RANDOM = "random"
 
 
 class SAGreedyScheduler(BaseScheduler):
@@ -46,7 +55,7 @@ class SAGreedyScheduler(BaseScheduler):
         self,
         cluster: Cluster,
         initial_temp: float = 1000.0,
-        cooling_rate: float = 0.8,
+        cooling_rate: float = 0.99,
         min_temp: float = 1,
         max_iterations: int = 1000
     ):

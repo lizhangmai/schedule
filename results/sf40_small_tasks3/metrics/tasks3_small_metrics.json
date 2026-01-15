@@ -1,0 +1,35 @@
+{
+  "FIFO": {
+    "weighted_completion_time": 4475253.186009951,
+    "average_completion_time": 994.9694327690846,
+    "deadline_miss_count": 1493.0,
+    "deadline_miss_rate": 0.9953333333333333,
+    "weighted_tardiness": 4400151.266664294,
+    "makespan": 3505.510000000004,
+    "gpu_time_utilization": 0.9984224063630472,
+    "gpu_peak_memory_utilization": 0.6,
+    "gpu_average_memory_utilization": 0.38480309537328905
+  },
+  "Greedy": {
+    "weighted_completion_time": 4474466.802332857,
+    "average_completion_time": 994.7619942911332,
+    "deadline_miss_count": 1494.0,
+    "deadline_miss_rate": 0.996,
+    "weighted_tardiness": 4399362.711920337,
+    "makespan": 3501.4559459459424,
+    "gpu_time_utilization": 0.9992217976753075,
+    "gpu_peak_memory_utilization": 0.6,
+    "gpu_average_memory_utilization": 0.3809975853371412
+  },
+  "SAGreedy": {
+    "weighted_completion_time": 4023365.9107041243,
+    "average_completion_time": 922.0541701280232,
+    "deadline_miss_count": 851.0,
+    "deadline_miss_rate": 0.5673333333333334,
+    "weighted_tardiness": 3959335.614473683,
+    "makespan": 3796.833243243242,
+    "gpu_time_utilization": 0.9224182507982608,
+    "gpu_peak_memory_utilization": 0.6,
+    "gpu_average_memory_utilization": 0.3531116068508678
+  }
+}

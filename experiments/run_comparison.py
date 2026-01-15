@@ -99,22 +99,7 @@ def run_experiment(
     logging.info(f"Loaded {len(tasks)} tasks from {tasks_file}")
 
     # 集群工厂（支持 scaling_factor）
-    def create_cluster(size: str, sf: float):
-        if size == "small":
-            return create_small_cluster(sf)
-        elif size == "medium":
-            return create_medium_cluster(sf)
-        elif size == "large":
-            return create_large_cluster(sf)
-        else:
-            raise ValueError(f"Unknown cluster size: {size}")
-
-    # 旧的集群工厂（保持兼容性）
-    cluster_factories = {
-        "small": lambda: create_cluster("small", scaling_factor),
-        "medium": lambda: create_cluster("medium", scaling_factor),
-        "large": lambda: create_cluster("large", scaling_factor),
-    }
+    from src.models.cluster import create_cluster
 
     # 调度器工厂函数
     def create_scheduler(algo_name: str, cluster):
@@ -134,7 +119,7 @@ def run_experiment(
         logging.info(f"Running {algo_name}...")
 
         # 关键修复：每个算法创建新的集群实例（使用 scaling_factor）
-        cluster = cluster_factories[cluster_size]()
+        cluster = create_cluster(cluster_size, scaling_factor)
         logging.info(f"  Created {cluster_size} cluster with {cluster.get_gpu_count()} GPUs (scaling_factor={scaling_factor})")
 
         # 关键修复：每个算法使用任务的副本，避免状态污染
@@ -173,11 +158,68 @@ def run_experiment(
         logging.info(f"  Weighted Tardiness: {metrics.weighted_tardiness:.2f}")
         logging.info(f"  Deadline Miss Rate: {metrics.deadline_miss_rate:.2%}")
         logging.info(f"  GPU Time Util: {metrics.gpu_time_utilization:.2%}")
-        logging.info(f"  Avg Concurrent Tasks: {metrics.gpu_average_concurrent_tasks:.2f}")
         logging.info(f"  Peak Memory Util: {metrics.gpu_peak_memory_utilization:.2%}")
         logging.info(f"  Avg Memory Util: {metrics.gpu_average_memory_utilization:.2%}")
 
     return results
+
+
+def _create_gpu_utilization_plot(
+    results: Dict[str, Tuple[SimulationResult, object]],
+    save_path: str,
+) -> None:
+    """
+    创建 GPU 利用率对比图表
+
+    Args:
+        results: Dict[算法名, (仿真结果, 集群对象)]
+        save_path: 图表保存路径
+    """
+    algorithms = []
+    time_utils = []
+    avg_memory_utils = []
+
+    for algo_name, (result, cluster) in results.items():
+        metrics = MetricsCalculator.calculate(result.tasks, cluster, result)
+        algorithms.append(algo_name)
+        time_utils.append(metrics.gpu_time_utilization)
+        avg_memory_utils.append(metrics.gpu_average_memory_utilization)
+
+    import numpy as np
+    import matplotlib.pyplot as plt
+
+    x = np.arange(len(algorithms))
+    width = 0.35
+
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    bars1 = ax.bar(x - width / 2, time_utils, width, label="Time Utilization", alpha=0.8)
+    bars2 = ax.bar(x + width / 2, avg_memory_utils, width, label="Average Memory Utilization", alpha=0.8)
+
+    ax.set_xlabel("Algorithm")
+    ax.set_ylabel("Utilization")
+    ax.set_title("GPU Utilization Comparison")
+    ax.set_xticks(x)
+    ax.set_xticklabels(algorithms)
+    ax.legend()
+    ax.set_ylim([0, 1])
+
+    for bars in [bars1, bars2]:
+        for bar in bars:
+            height = bar.get_height()
+            ax.annotate(
+                f"{height:.2f}",
+                xy=(bar.get_x() + bar.get_width() / 2, height),
+                xytext=(0, 3),
+                textcoords="offset points",
+                ha="center",
+                va="bottom",
+                fontsize=8,
+            )
+
+    plt.tight_layout()
+    plt.savefig(save_path, dpi=300, bbox_inches="tight")
+    plt.close()
 
 
 def save_schedule_results(
@@ -363,53 +405,8 @@ def save_results(
     logging.info(f"  Saved comparison plot to {comparison_path}")
 
     # GPU 利用率对比 - 使用每个算法对应的集群
-    algorithms = []
-    time_utils = []
-    avg_memory_utils = []
-
-    for algo_name, (result, cluster) in results.items():
-        metrics = MetricsCalculator.calculate(result.tasks, cluster, result)
-        algorithms.append(algo_name)
-        time_utils.append(metrics.gpu_time_utilization)
-        avg_memory_utils.append(metrics.gpu_average_memory_utilization)
-
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    x = np.arange(len(algorithms))
-    width = 0.35
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    bars1 = ax.bar(x - width / 2, time_utils, width, label="Time Utilization", alpha=0.8)
-    bars2 = ax.bar(x + width / 2, avg_memory_utils, width, label="Average Memory Utilization", alpha=0.8)
-
-    ax.set_xlabel("Algorithm")
-    ax.set_ylabel("Utilization")
-    ax.set_title("GPU Utilization Comparison")
-    ax.set_xticks(x)
-    ax.set_xticklabels(algorithms)
-    ax.legend()
-    ax.set_ylim([0, 1])
-
-    # 添加数值标签
-    for bars in [bars1, bars2]:
-        for bar in bars:
-            height = bar.get_height()
-            ax.annotate(
-                f"{height:.2f}",
-                xy=(bar.get_x() + bar.get_width() / 2, height),
-                xytext=(0, 3),
-                textcoords="offset points",
-                ha="center",
-                va="bottom",
-                fontsize=8,
-            )
-
-    plt.tight_layout()
     util_path = figures_dir / f"{experiment_name}_gpu_utilization.png"
-    plt.savefig(util_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    _create_gpu_utilization_plot(results, str(util_path))
     logging.info(f"  Saved GPU utilization plot to {util_path}")
 
     # 为每个算法生成甘特图（两种：全部任务 + 前50个任务）
@@ -479,52 +476,8 @@ def plot_from_saved(
     logging.info(f"  Saved comparison plot to {comparison_path}")
 
     # GPU 利用率对比
-    algorithms = []
-    time_utils = []
-    avg_memory_utils = []
-
-    for algo_name, (result, cluster) in results.items():
-        metrics = MetricsCalculator.calculate(result.tasks, cluster, result)
-        algorithms.append(algo_name)
-        time_utils.append(metrics.gpu_time_utilization)
-        avg_memory_utils.append(metrics.gpu_average_memory_utilization)
-
-    import numpy as np
-    import matplotlib.pyplot as plt
-
-    x = np.arange(len(algorithms))
-    width = 0.35
-
-    fig, ax = plt.subplots(figsize=(10, 6))
-
-    bars1 = ax.bar(x - width / 2, time_utils, width, label="Time Utilization", alpha=0.8)
-    bars2 = ax.bar(x + width / 2, avg_memory_utils, width, label="Average Memory Utilization", alpha=0.8)
-
-    ax.set_xlabel("Algorithm")
-    ax.set_ylabel("Utilization")
-    ax.set_title("GPU Utilization Comparison")
-    ax.set_xticks(x)
-    ax.set_xticklabels(algorithms)
-    ax.legend()
-    ax.set_ylim([0, 1])
-
-    for bars in [bars1, bars2]:
-        for bar in bars:
-            height = bar.get_height()
-            ax.annotate(
-                f"{height:.2f}",
-                xy=(bar.get_x() + bar.get_width() / 2, height),
-                xytext=(0, 3),
-                textcoords="offset points",
-                ha="center",
-                va="bottom",
-                fontsize=8,
-            )
-
-    plt.tight_layout()
     util_path = figures_dir / f"{experiment_name}_gpu_utilization.png"
-    plt.savefig(util_path, dpi=300, bbox_inches="tight")
-    plt.close()
+    _create_gpu_utilization_plot(results, str(util_path))
     logging.info(f"  Saved GPU utilization plot to {util_path}")
 
     # 为每个算法生成甘特图（两种：全部任务 + 前50个任务）
