@@ -283,6 +283,504 @@ Although computationally more expensive than FIFO and Greedy ($O(N \log N + N \c
 
 
 
+\section{Experimental Evaluation}
+
+\subsection{Experimental Setup}
+
+\subsubsection{Dataset Description}
+We evaluate the proposed algorithms on four datasets with varying characteristics:
+\begin{itemize}
+    \item \textbf{tasks1}: Course-provided dataset with 1000 tasks, medium load level.
+    \item \textbf{tasks2}: Course-provided dataset with 2000 tasks, medium load level.
+    \item \textbf{tasks3}: Self-generated dataset with 1000 tasks, high load level (tighter deadlines).
+    \item \textbf{tasks4}: Self-generated dataset with 2000 tasks, extreme load level (very tight deadlines).
+\end{itemize}
+
+Each task is characterized by workload ($L_i$), memory demand ($m_i$), deadline ($d_i$), weight ($w_i$), and arrival time ($a_i$). The datasets feature heterogeneous task requirements and dynamic arrival patterns.
+
+\subsubsection{Cluster Configuration}
+We use three cluster sizes to evaluate scalability:
+\begin{itemize}
+    \item \textbf{Small}: 3 GPUs (1 A100, 1 A30, 1 L40)
+    \item \textbf{Medium}: 6 GPUs (2 of each model)
+    \item \textbf{Large}: 9 GPUs (3 of each model)
+\end{itemize}
+
+The GPU specifications are based on real NVIDIA hardware: A100 (80GB, 57.0x scaling), A30 (24GB, 30.0x baseline), and L40 (48GB, 55.5x scaling). This heterogeneity forces multi-GPU collaboration as no single GPU can handle all tasks independently.
+
+\subsubsection{Algorithm Parameters}
+For the SAGreedy meta-heuristic, we use the following parameters:
+\begin{itemize}
+    \item Initial temperature: $T_{initial} = 1000$
+    \item Cooling rate: $\alpha = 0.95$
+    \item Maximum iterations: $K = 100$
+    \item Priority ratio range: $\rho \in [0.1, 0.8]$
+\end{itemize}
+
+\subsection{Results and Discussion}
+
+Tables \ref{tab:tasks1_results}, \ref{tab:tasks2_results}, and \ref{tab:tasks4_results} present the performance comparison of the three algorithms on representative datasets with small, medium, and large clusters, respectively.
+
+% Table for tasks1 (small cluster)
+\begin{table}[htbp]
+\caption{Algorithm performance on tasks1 (small cluster)}
+\label{tab:tasks1_results}
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{l|cccccccc}
+\hline
+Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+\hline
+FIFO & 22292 & 9.16 & 57 & 5.7\% & 524 & 2503 & 85.6\% & 32.1\% \\
+Greedy & 22830 & 9.38 & 52 & 5.2\% & 503 & 2498 & 80.4\% & 27.0\% \\
+SAGreedy & 22967 & 9.45 & 49 & 4.9\% & \textbf{393} & 2498 & 80.5\% & 27.3\% \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+% Table for tasks2 (medium cluster)
+\begin{table}[htbp]
+\caption{Algorithm performance on tasks2 (medium cluster)}
+\label{tab:tasks2_results}
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{l|cccccccc}
+\hline
+Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+\hline
+FIFO & 16272 & 6.45 & 19 & 1.9\% & 140 & 2493 & 43.1\% & 15.5\% \\
+Greedy & 13508 & 5.38 & 1 & 0.1\% & \textbf{0.35} & 2493 & 35.4\% & 7.9\% \\
+SAGreedy & 13508 & 5.38 & 1 & 0.1\% & \textbf{0.35} & 2493 & 35.4\% & 7.9\% \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+% Table for tasks4 (large cluster, high load)
+\begin{table}[htbp]
+\caption{Algorithm performance on tasks4 (large cluster)}
+\label{tab:tasks4_results}
+\resizebox{\columnwidth}{!}{
+\begin{tabular}{l|cccccccc}
+\hline
+Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+\hline
+FIFO & 2.33M & 382.5 & 1982 & 99.1\% & 2.26M & 1784 & 99.4\% & 38.0\% \\
+Greedy & 2.33M & 382.2 & 1982 & 99.1\% & 2.26M & 1777 & 99.7\% & 38.1\% \\
+SAGreedy & \textbf{2.30M} & \textbf{385.0} & \textbf{1825} & \textbf{91.3\%} & \textbf{2.23M} & 1803 & 98.3\% & 37.3\% \\
+\hline
+\end{tabular}
+}
+\end{table}
+
+\subsubsection{Key Observations}
+
+\textbf{1. Weighted Tardiness Minimization:}
+SAGreedy consistently achieves the lowest weighted tardiness (WT) across all datasets. On tasks1, SAGreedy reduces WT by 25\% compared to FIFO and 22\% compared to Greedy. This validates the effectiveness of the simulated annealing approach in optimizing the primary objective.
+
+\textbf{2. Deadline Miss Performance:}
+On datasets with moderate load (tasks1, tasks2), all algorithms maintain reasonable deadline miss rates below 6\%. However, under extreme load (tasks4), SAGreedy significantly outperforms the baselines, reducing the deadline miss rate from 99.1\% to 91.3\% by explicitly prioritizing tardy tasks.
+
+\textbf{3. GPU Utilization Trade-offs:}
+FIFO achieves higher GPU time utilization (85.6\% vs. 80.4\% for Greedy on tasks1) but at the cost of higher weighted tardiness. This highlights that na{\"i}ve resource occupation does not translate to better scheduling quality when weighted deadlines are considered.
+
+\textbf{4. Scalability:}
+As the cluster size increases from 3 to 9 GPUs, the relative performance gap between algorithms narrows on easy instances (tasks2), where all methods achieve near-optimal solutions. However, on hard instances (tasks4), the advantage of SAGreedy becomes more pronounced, demonstrating the value of meta-heuristic search for complex scheduling scenarios.
+
+\subsubsection{Visual Analysis}
+
+Figures \ref{fig:gantt_comparison} and \ref{fig:utilization_comparison} provide visual insights into the scheduling behavior.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_FIFO_first50.png}
+\hfill
+\includegraphics[width=0.48\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_SAGreedy_first50.png}
+\caption{Gantt charts: FIFO vs. SAGreedy (first 50 tasks). Red: deadline misses, green: on-time.}
+\label{fig:gantt_comparison}
+\end{figure}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.48\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_comparison.png}
+\caption{Algorithm comparison on tasks1 (small cluster).}
+\label{fig:utilization_comparison}
+\end{figure}
+
+\section{Conclusion}
+
+This paper addresses the Heterogeneous GPU Scheduling Problem (HGSP), an NP-hard optimization problem with practical significance in cloud computing and high-performance computing environments. We formalized the problem with weighted tardiness minimization as the primary objective and proposed three scheduling algorithms:
+
+\textbf{FIFO} provides a simple baseline that processes tasks in arrival order. \textbf{Greedy (EFT)} improves upon FIFO by considering GPU heterogeneity through earliest finish time assignment. \textbf{SAGreedy} combines simulated annealing for task ordering with greedy GPU assignment to explicitly optimize weighted tardiness.
+
+Experimental evaluation on four datasets with varying load levels demonstrates that:
+\begin{enumerate}
+    \item SAGreedy consistently achieves the lowest weighted tardiness, with up to 25\% improvement over FIFO on moderate-load datasets.
+    \item Under extreme load, SAGreedy reduces deadline miss rate by 7.8 percentage points compared to baselines.
+    \item GPU utilization alone is an insufficient metric; intelligent scheduling that considers deadlines and priorities significantly improves system performance.
+\end{enumerate}
+
+The results validate that meta-heuristic approaches like simulated annealing can effectively navigate the complex solution space of heterogeneous scheduling problems, even with dynamic task arrivals. Future work may explore reinforcement learning for online adaptation and multi-objective optimization considering energy consumption and fairness.
+
+% \appendix
+% \section{Additional Experimental Results}
+
+% This appendix provides comprehensive experimental results across all dataset and cluster size combinations. Tables IV-X present detailed performance metrics for configurations not shown in the main text. Figures 3-26 display Gantt chart visualizations for all algorithms.
+
+% \subsection{Additional Performance Metrics}
+
+% Tables IV-X show algorithm performance on remaining dataset/cluster combinations.
+
+% % Table for tasks1 (large cluster)
+% \begin{table}[htbp]
+% \caption{Algorithm performance on tasks1 (large cluster)}
+% \label{tab:tasks1_large_results}
+% \resizebox{\columnwidth}{!}{
+% \begin{tabular}{l|cccccccc}
+% \hline
+% Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+% \hline
+% FIFO & 14938 & 6.07 & 15 & 1.5\% & 83.22 & 2496 & 27.0\% & 8.3\% \\
+% Greedy & 13119 & 5.34 & 0 & 0.0\% & 0.00 & 2496 & 23.8\% & 4.9\% \\
+% SAGreedy & 13119 & 5.34 & 0 & 0.0\% & 0.00 & 2496 & 23.8\% & 4.9\% \\
+% \hline
+% \end{tabular}
+% }
+% \end{table}
+
+% % Table for tasks2 (small cluster)
+% \begin{table}[htbp]
+% \caption{Algorithm performance on tasks2 (small cluster)}
+% \label{tab:tasks2_small_results}
+% \resizebox{\columnwidth}{!}{
+% \begin{tabular}{l|cccccccc}
+% \hline
+% Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+% \hline
+% FIFO & 21785 & 8.67 & 52 & 5.2\% & 524.5 & 2495 & 84.5\% & 31.4\% \\
+% Greedy & 22342 & 8.92 & 53 & 5.3\% & 504.3 & 2496 & 78.9\% & 25.6\% \\
+% SAGreedy & 22418 & 8.97 & 54 & 5.4\% & 454.8 & 2496 & 78.9\% & 25.7\% \\
+% \hline
+% \end{tabular}
+% }
+% \end{table}
+
+% % Table for tasks3 (small cluster)
+% \begin{table}[htbp]
+% \caption{Algorithm performance on tasks3 (small cluster)}
+% \label{tab:tasks3_small_results}
+% \resizebox{\columnwidth}{!}{
+% \begin{tabular}{l|cccccccc}
+% \hline
+% Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+% \hline
+% FIFO & 4.48M & 995 & 1493 & 99.5\% & 4.40M & 3506 & 99.8\% & 38.5\% \\
+% Greedy & 4.47M & 995 & 1494 & 99.6\% & 4.40M & 3501 & 99.9\% & 38.1\% \\
+% SAGreedy & 4.02M & 922 & 851 & 56.7\% & 3.96M & 3797 & 92.2\% & 35.3\% \\
+% \hline
+% \end{tabular}
+% }
+% \end{table}
+
+% % Table for tasks3 (medium cluster)
+% \begin{table}[htbp]
+% \caption{Algorithm performance on tasks3 (medium cluster)}
+% \label{tab:tasks3_medium_results}
+% \resizebox{\columnwidth}{!}{
+% \begin{tabular}{l|cccccccc}
+% \hline
+% Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+% \hline
+% FIFO & 554470 & 123.3 & 1430 & 95.3\% & 480572 & 1757 & 99.6\% & 38.5\% \\
+% Greedy & 553083 & 123.0 & 1428 & 95.2\% & 479169 & 1754 & 99.7\% & 38.3\% \\
+% SAGreedy & 484357 & 112.0 & 1318 & 87.9\% & 411817 & 1768 & 98.8\% & 37.6\% \\
+% \hline
+% \end{tabular}
+% }
+% \end{table}
+
+% % Table for tasks3 (large cluster)
+% \begin{table}[htbp]
+% \caption{Algorithm performance on tasks3 (large cluster)}
+% \label{tab:tasks3_large_results}
+% \resizebox{\columnwidth}{!}{
+% \begin{tabular}{l|cccccccc}
+% \hline
+% Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+% \hline
+% FIFO & 35691 & 7.94 & 51 & 3.4\% & 221.2 & 1512 & 78.2\% & 30.5\% \\
+% Greedy & 35410 & 7.89 & 33 & 2.2\% & 171.2 & 1503 & 70.0\% & 21.4\% \\
+% SAGreedy & 35669 & 7.95 & 27 & 1.8\% & 75.21 & 1503 & 70.1\% & 21.5\% \\
+% \hline
+% \end{tabular}
+% }
+% \end{table}
+
+% % Table for tasks4 (small cluster)
+% \begin{table}[htbp]
+% \caption{Algorithm performance on tasks4 (small cluster)}
+% \label{tab:tasks4_small_results}
+% \resizebox{\columnwidth}{!}{
+% \begin{tabular}{l|cccccccc}
+% \hline
+% Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+% \hline
+% FIFO & 13.12M & 2149 & 1996 & 99.8\% & 13.04M & 5319 & 100.0\% & 38.1\% \\
+% Greedy & 13.12M & 2149 & 1995 & 99.8\% & 13.04M & 5320 & 99.9\% & 37.6\% \\
+% SAGreedy & 12.92M & 2135 & 1957 & 97.9\% & 12.84M & 5334 & 99.7\% & 37.8\% \\
+% \hline
+% \end{tabular}
+% }
+% \end{table}
+
+% % Table for tasks4 (medium cluster)
+% \begin{table}[htbp]
+% \caption{Algorithm performance on tasks4 (medium cluster)}
+% \label{tab:tasks4_medium_results}
+% \resizebox{\columnwidth}{!}{
+% \begin{tabular}{l|cccccccc}
+% \hline
+% Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+% \hline
+% FIFO & 5.03M & 823.8 & 1989 & 99.5\% & 4.95M & 2664 & 99.8\% & 38.3\% \\
+% Greedy & 5.03M & 823.8 & 1991 & 99.6\% & 4.95M & 2665 & 99.7\% & 38.0\% \\
+% SAGreedy & 4.95M & 815.9 & 1884 & 94.2\% & 4.88M & 2683 & 99.0\% & 37.2\% \\
+% \hline
+% \end{tabular}
+% }
+% \end{table}
+
+% \subsection{Gantt Charts}
+
+% Figures 3-26 show Gantt chart visualizations for all algorithms across different dataset and cluster configurations. Each row displays FIFO (left), Greedy (center), and SAGreedy (right) results.
+
+% % tasks1 small cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_SAGreedy_first50.png}
+% \caption{tasks1 (small): First 50 tasks.}
+% \label{fig:gantt_tasks1_small_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_SAGreedy_all.png}
+% \caption{tasks1 (small): All tasks.}
+% \label{fig:gantt_tasks1_small_all}
+% \end{figure}
+
+% % tasks1 medium cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks1/figures/tasks1_medium_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks1/figures/tasks1_medium_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks1/figures/tasks1_medium_gantt_SAGreedy_first50.png}
+% \caption{tasks1 (medium): First 50 tasks.}
+% \label{fig:gantt_tasks1_medium_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks1/figures/tasks1_medium_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks1/figures/tasks1_medium_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks1/figures/tasks1_medium_gantt_SAGreedy_all.png}
+% \caption{tasks1 (medium): All tasks.}
+% \label{fig:gantt_tasks1_medium_all}
+% \end{figure}
+
+% % tasks1 large cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks1/figures/tasks1_large_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks1/figures/tasks1_large_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks1/figures/tasks1_large_gantt_SAGreedy_first50.png}
+% \caption{tasks1 (large): First 50 tasks.}
+% \label{fig:gantt_tasks1_large_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks1/figures/tasks1_large_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks1/figures/tasks1_large_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks1/figures/tasks1_large_gantt_SAGreedy_all.png}
+% \caption{tasks1 (large): All tasks.}
+% \label{fig:gantt_tasks1_large_all}
+% \end{figure}
+
+% % tasks2 small cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks2/figures/tasks2_small_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks2/figures/tasks2_small_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks2/figures/tasks2_small_gantt_SAGreedy_first50.png}
+% \caption{tasks2 (small): First 50 tasks.}
+% \label{fig:gantt_tasks2_small_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks2/figures/tasks2_small_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks2/figures/tasks2_small_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks2/figures/tasks2_small_gantt_SAGreedy_all.png}
+% \caption{tasks2 (small): All tasks.}
+% \label{fig:gantt_tasks2_small_all}
+% \end{figure}
+
+% % tasks2 medium cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks2/figures/tasks2_medium_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks2/figures/tasks2_medium_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks2/figures/tasks2_medium_gantt_SAGreedy_first50.png}
+% \caption{tasks2 (medium): First 50 tasks.}
+% \label{fig:gantt_tasks2_medium_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks2/figures/tasks2_medium_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks2/figures/tasks2_medium_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks2/figures/tasks2_medium_gantt_SAGreedy_all.png}
+% \caption{tasks2 (medium): All tasks.}
+% \label{fig:gantt_tasks2_medium_all}
+% \end{figure}
+
+% % tasks2 large cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks2/figures/tasks2_large_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks2/figures/tasks2_large_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks2/figures/tasks2_large_gantt_SAGreedy_first50.png}
+% \caption{tasks2 (large): First 50 tasks.}
+% \label{fig:gantt_tasks2_large_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks2/figures/tasks2_large_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks2/figures/tasks2_large_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks2/figures/tasks2_large_gantt_SAGreedy_all.png}
+% \caption{tasks2 (large): All tasks.}
+% \label{fig:gantt_tasks2_large_all}
+% \end{figure}
+
+% % tasks3 small cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks3/figures/tasks3_small_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks3/figures/tasks3_small_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks3/figures/tasks3_small_gantt_SAGreedy_first50.png}
+% \caption{tasks3 (small): First 50 tasks.}
+% \label{fig:gantt_tasks3_small_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks3/figures/tasks3_small_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks3/figures/tasks3_small_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks3/figures/tasks3_small_gantt_SAGreedy_all.png}
+% \caption{tasks3 (small): All tasks.}
+% \label{fig:gantt_tasks3_small_all}
+% \end{figure}
+
+% % tasks3 medium cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks3/figures/tasks3_medium_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks3/figures/tasks3_medium_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks3/figures/tasks3_medium_gantt_SAGreedy_first50.png}
+% \caption{tasks3 (medium): First 50 tasks.}
+% \label{fig:gantt_tasks3_medium_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks3/figures/tasks3_medium_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks3/figures/tasks3_medium_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks3/figures/tasks3_medium_gantt_SAGreedy_all.png}
+% \caption{tasks3 (medium): All tasks.}
+% \label{fig:gantt_tasks3_medium_all}
+% \end{figure}
+
+% % tasks3 large cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks3/figures/tasks3_large_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks3/figures/tasks3_large_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks3/figures/tasks3_large_gantt_SAGreedy_first50.png}
+% \caption{tasks3 (large): First 50 tasks.}
+% \label{fig:gantt_tasks3_large_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks3/figures/tasks3_large_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks3/figures/tasks3_large_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks3/figures/tasks3_large_gantt_SAGreedy_all.png}
+% \caption{tasks3 (large): All tasks.}
+% \label{fig:gantt_tasks3_large_all}
+% \end{figure}
+
+% % tasks4 small cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks4/figures/tasks4_small_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks4/figures/tasks4_small_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks4/figures/tasks4_small_gantt_SAGreedy_first50.png}
+% \caption{tasks4 (small): First 50 tasks.}
+% \label{fig:gantt_tasks4_small_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks4/figures/tasks4_small_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks4/figures/tasks4_small_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks4/figures/tasks4_small_gantt_SAGreedy_all.png}
+% \caption{tasks4 (small): All tasks.}
+% \label{fig:gantt_tasks4_small_all}
+% \end{figure}
+
+% % tasks4 medium cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks4/figures/tasks4_medium_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks4/figures/tasks4_medium_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks4/figures/tasks4_medium_gantt_SAGreedy_first50.png}
+% \caption{tasks4 (medium): First 50 tasks.}
+% \label{fig:gantt_tasks4_medium_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks4/figures/tasks4_medium_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks4/figures/tasks4_medium_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_medium_tasks4/figures/tasks4_medium_gantt_SAGreedy_all.png}
+% \caption{tasks4 (medium): All tasks.}
+% \label{fig:gantt_tasks4_medium_all}
+% \end{figure}
+
+% % tasks4 large cluster
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks4/figures/tasks4_large_gantt_FIFO_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks4/figures/tasks4_large_gantt_Greedy_first50.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks4/figures/tasks4_large_gantt_SAGreedy_first50.png}
+% \caption{tasks4 (large): First 50 tasks.}
+% \label{fig:gantt_tasks4_large_first50}
+% \end{figure}
+
+% \begin{figure}[htbp]
+% \centering
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks4/figures/tasks4_large_gantt_FIFO_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks4/figures/tasks4_large_gantt_Greedy_all.png}
+% \includegraphics[width=0.32\textwidth]{../results/sf40_large_tasks4/figures/tasks4_large_gantt_SAGreedy_all.png}
+% \caption{tasks4 (large): All tasks.}
+% \label{fig:gantt_tasks4_large_all}
+% \end{figure}
+
 \end{document}
 
 
