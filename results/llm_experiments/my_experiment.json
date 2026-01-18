@@ -1,0 +1,38 @@
+{
+  "discriminating_FIFO": {
+    "weighted_waiting_time": 336.3999999999997,
+    "average_waiting_time": 2.4019999999999984,
+    "makespan": 3.0099999999999905,
+    "completed_count": 20,
+    "total_count": 20,
+    "completion_rate": 1.0,
+    "gpu_utilization": 0.0
+  },
+  "discriminating_WeightedFIFO": {
+    "weighted_waiting_time": 108.03999999999996,
+    "average_waiting_time": 1.8019999999999983,
+    "makespan": 4.509999999999991,
+    "completed_count": 20,
+    "total_count": 20,
+    "completion_rate": 1.0,
+    "gpu_utilization": 0.0
+  },
+  "discriminating_SRPT": {
+    "weighted_waiting_time": 108.03999999999996,
+    "average_waiting_time": 1.8019999999999983,
+    "makespan": 4.509999999999991,
+    "completed_count": 20,
+    "total_count": 20,
+    "completion_rate": 1.0,
+    "gpu_utilization": 0.0
+  },
+  "discriminating_WSRPT": {
+    "weighted_waiting_time": 108.03999999999996,
+    "average_waiting_time": 1.8019999999999983,
+    "makespan": 4.509999999999991,
+    "completed_count": 20,
+    "total_count": 20,
+    "completion_rate": 1.0,
+    "gpu_utilization": 0.0
+  }
+}

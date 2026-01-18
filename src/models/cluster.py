@@ -2,6 +2,13 @@
 Cluster 类：管理多个 GPU 资源
 """
 
+# Add project root to path for imports
+import sys
+from pathlib import Path
+project_root = Path(__file__).parent.parent.parent
+if str(project_root) not in sys.path:
+    sys.path.insert(0, str(project_root))
+
 from dataclasses import dataclass, field
 from typing import List, Dict, TYPE_CHECKING, Optional
 

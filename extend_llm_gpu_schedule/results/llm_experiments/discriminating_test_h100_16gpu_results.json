@@ -1,0 +1,139 @@
+{
+  "workload": "discriminating_test",
+  "cluster": "h100_16gpu",
+  "timestamp": "2026-01-16T13:33:48.974120",
+  "results": [
+    {
+      "algorithm": "FIFO",
+      "success": true,
+      "metrics": {
+        "weighted_waiting_time": 83.88888888888889,
+        "average_waiting_time": 0.4444444444444445,
+        "total_tasks": 20,
+        "completed_tasks": 20,
+        "completion_rate": 1.0,
+        "prefill_completion_time": 0.4444444444444445,
+        "decode_completion_time": 0.0,
+        "gpu_utilization": 0.0,
+        "throughput": 28.8,
+        "batch_efficiency": 0.0,
+        "makespan": 0.6944444444444444
+      },
+      "state": {
+        "completed_tasks": 20,
+        "total_tasks": 20,
+        "makespan": 0.6944444444444444
+      },
+      "tasks": [
+        "LLMTask(T_short_low_7, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_8, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_6, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_1, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_5, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_2, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_3, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_4, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_12, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_8, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_4, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_7, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_2, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_11, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_1, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_9, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_5, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_3, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_6, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_10, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)"
+      ]
+    },
+    {
+      "algorithm": "WeightedFIFO",
+      "success": true,
+      "metrics": {
+        "weighted_waiting_time": 83.88888888888889,
+        "average_waiting_time": 0.4444444444444445,
+        "total_tasks": 20,
+        "completed_tasks": 20,
+        "completion_rate": 1.0,
+        "prefill_completion_time": 0.4444444444444445,
+        "decode_completion_time": 0.0,
+        "gpu_utilization": 0.0,
+        "throughput": 28.8,
+        "batch_efficiency": 0.0,
+        "makespan": 0.6944444444444444
+      },
+      "state": {
+        "completed_tasks": 20,
+        "total_tasks": 20,
+        "makespan": 0.6944444444444444
+      },
+      "tasks": [
+        "LLMTask(T_short_low_7, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_8, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_6, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_1, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_5, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_2, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_3, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_4, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_12, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_8, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_4, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_7, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_2, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_11, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_1, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_9, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_5, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_3, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_6, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_10, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)"
+      ]
+    },
+    {
+      "algorithm": "SRPT",
+      "success": true,
+      "metrics": {
+        "weighted_waiting_time": 83.88888888888889,
+        "average_waiting_time": 0.4444444444444445,
+        "total_tasks": 20,
+        "completed_tasks": 20,
+        "completion_rate": 1.0,
+        "prefill_completion_time": 0.4444444444444445,
+        "decode_completion_time": 0.0,
+        "gpu_utilization": 0.0,
+        "throughput": 28.8,
+        "batch_efficiency": 0.0,
+        "makespan": 0.6944444444444444
+      },
+      "state": {
+        "completed_tasks": 20,
+        "total_tasks": 20,
+        "makespan": 0.6944444444444444
+      },
+      "tasks": [
+        "LLMTask(T_short_low_7, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_8, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_6, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_1, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_5, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_2, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_3, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_short_low_4, model=Qwen3, phase=PREFILL, tokens=500, weight=1, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_12, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_8, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_4, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_7, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_2, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_11, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_1, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_9, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_5, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_3, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_6, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)",
+        "LLMTask(T_long_high_10, model=Qwen3, phase=PREFILL, tokens=5000, weight=10, arrival=0.00, status=completed)"
+      ]
+    }
+  ]
+}

@@ -1,0 +1,6 @@
+Task,Workload,Memory,Weight,ArrivalTime,Phase,Tokens
+T1,DeepSeek-R1,671,17.98,0.36,1,2048
+T2,Qwen3,30,13.79,0.63,1,4096
+T3,Qwen3,30,43.01,0.84,0,1024
+T4,GLM4.7,355,40.89,3.76,1,0
+T5,DeepSeek-R1,671,30.46,6.72,0,1024

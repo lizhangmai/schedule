@@ -1,0 +1,2 @@
+Algorithm,weighted_waiting_time,average_waiting_time,total_tasks,completed_tasks,completion_rate,prefill_completion_time,decode_completion_time,gpu_utilization,throughput,batch_efficiency,makespan
+FIFO,7.844977777777777,0.5688888888888889,5,1,0.2,0.5688888888888889,0.0,0.0,0.1488095238095238,0.03125,6.72

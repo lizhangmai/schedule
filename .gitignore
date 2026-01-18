@@ -100,3 +100,5 @@ Thumbs.db
 latex_prj/*
 !latex_prj/*.tex
 !latex_prj/*.pdf
+
+CLAUDE.md

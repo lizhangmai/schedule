@@ -1,0 +1,29 @@
+{
+  "workload": "llm_task1",
+  "cluster": "h100_8gpu",
+  "timestamp": "2026-01-15T20:31:37.412294",
+  "results": [
+    {
+      "algorithm": "FIFO",
+      "success": true,
+      "metrics": {
+        "weighted_waiting_time": 7.844977777777777,
+        "average_waiting_time": 0.5688888888888889,
+        "total_tasks": 5,
+        "completed_tasks": 1,
+        "completion_rate": 0.2,
+        "prefill_completion_time": 0.5688888888888889,
+        "decode_completion_time": 0.0,
+        "gpu_utilization": 0.0,
+        "throughput": 0.1488095238095238,
+        "batch_efficiency": 0.03125,
+        "makespan": 6.72
+      },
+      "state": {
+        "completed_tasks": 1,
+        "total_tasks": 5,
+        "makespan": 6.72
+      }
+    }
+  ]
+}
