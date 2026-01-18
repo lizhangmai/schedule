@@ -421,6 +421,150 @@ Experimental evaluation on four datasets with varying load levels demonstrates t
 
 The results validate that meta-heuristic approaches like simulated annealing can effectively navigate the complex solution space of heterogeneous scheduling problems, even with dynamic task arrivals. Future work may explore reinforcement learning for online adaptation and multi-objective optimization considering energy consumption and fairness.
 
+\section{LLM Inference GPU Scheduling}
+
+As an extension to the general heterogeneous GPU scheduling problem, we consider the specialized case of scheduling LLM inference requests on GPU clusters. LLM inference has unique characteristics that distinguish it from general computational workloads, particularly the two-phase execution model (prefill and decode) and the use of tensor parallelism for multi-GPU execution.
+
+\subsection{Problem Formulation}
+
+\subsubsection{LLM Inference Characteristics}
+
+Unlike traditional GPU workloads, LLM inference operates in two distinct phases:
+
+\begin{itemize}
+    \item \textbf{Prefill Phase (Compute-Bound)}: Processes the entire input prompt in parallel. This phase is compute-intensive with high arithmetic intensity, processing tokens at $\sim$1000--2000 tokens/s. It generates the key-value (KV) cache required for decoding.
+
+    \item \textbf{Decode Phase (Memory-Bound)}: Generates output tokens auto-regressively using the cached keys and values. This phase is memory bandwidth-limited, processing tokens at $\sim$100--500 tokens/s (single request), but can benefit significantly from continuous batching where multiple decode requests share GPU resources.
+\end{itemize}
+
+\subsubsection{Task Model}
+
+The LLM task model differs from the general model in several key aspects:
+
+\textbf{Task Parameters:}
+\begin{itemize}
+    \item $M_i$: Model name (e.g., ``Qwen3'', ``DeepSeek-R1'', ``Llama3-70B'')
+    \item $L_i$: Number of tokens to process (prefill or decode)
+    \item $\phi_i \in \{\text{PREFILL}, \text{DECODE}\}$: Execution phase
+    \item $m_i$: Total memory requirement (GB) for the model
+    \item $\tau_i$: Tensor parallelism degree (number of GPUs required)
+    \item $w_i$: Task priority weight
+    \item $a_i$: Arrival time
+\end{itemize}
+
+\textbf{Derived Parameters:}
+\begin{itemize}
+    \item $p_{ij}^{\phi} = \frac{L_i}{\lambda_{j}^{\phi}}$: Execution time on GPU $j$ in phase $\phi$, where $\lambda_{j}^{\phi}$ is the token throughput (tokens/s).
+    \item For prefill: $\lambda_{j}^{\text{PREFILL}} \approx 1000$ tokens/s
+    \item For decode: $\lambda_{j}^{\text{DECODE}} \approx 5000$ tokens/s (simplified model without batching)
+\end{itemize}
+
+\textbf{Constraints:}
+\begin{itemize}
+    \item \textbf{Multi-GPU Allocation}: Each task requires exactly $\tau_i$ GPUs for tensor parallelism
+    \item \textbf{Memory Capacity}: $\frac{m_i}{\tau_i} \le M_j$ for each allocated GPU $j$
+    \item \textbf{No Deadlines}: LLM inference tasks optimize for response time rather than meeting hard deadlines
+\end{itemize}
+
+\subsubsection{Objective Function}
+
+The primary objective is to minimize the \textbf{Total Weighted Waiting Time}:
+\begin{equation}
+    \text{Minimize } Z = \sum_{i \in \mathcal{T}} w_i \cdot (c_i - a_i)
+\end{equation}
+where $c_i$ is the completion time and $a_i$ is the arrival time.
+
+Secondary metrics include:
+\begin{itemize}
+    \item Average Waiting Time: $\frac{1}{n} \sum_{i \in \mathcal{T}} (c_i - a_i)$
+    \item Makespan: $C_{\max} = \max_{i \in \mathcal{T}} c_i$
+    \item Completion Rate: $\frac{|\{i : c_i \le T_{\max}\}|}{n}$
+\end{itemize}
+
+\subsection{Scheduling Algorithms}
+
+We implement and compare four scheduling algorithms adapted for LLM inference:
+
+\subsubsection{FIFO (First-In-First-Out)}
+Processes tasks strictly in arrival order. For each task, allocates the first available GPU group with sufficient memory and correct size ($\tau_i$ GPUs).
+
+\subsubsection{WeightedFIFO}
+Prioritizes tasks by weight first, then by arrival time. High-priority requests (larger $w_i$) are scheduled before low-priority requests, even if they arrive later.
+
+\subsubsection{SRPT (Shortest Remaining Processing Time)}
+Estimates remaining processing time based on token count and phase. Prefers tasks with shorter estimated duration to minimize average completion time.
+
+\subsubsection{WSRPT (Weighted Shortest Remaining Processing Time)}
+Combines weight and duration: prioritizes tasks with high weight-to-duration ratio. This optimizes for the weighted waiting time objective.
+
+\subsection{Experimental Evaluation}
+
+\subsubsection{Dataset Description}
+
+Since LLM inference workloads differ significantly from traditional GPU tasks, we design a custom synthetic workload that highlights algorithmic differences:
+
+\textbf{Discriminating Workload Design:}
+\begin{itemize}
+    \item 20 tasks arrive simultaneously at $t=0$
+    \item Cluster: 16 H100 GPUs (can run 8 concurrent tasks with $\tau=2$)
+    \item First 8 tasks: Low weight ($w=1$), long duration (2000 tokens)
+    \item Next 12 tasks: High weight ($w=10$), short duration (500 tokens)
+\end{itemize}
+
+This design forces a scheduling decision: only 8 of 20 tasks can run initially. The choice of which 8 tasks to start determines the weighted waiting time.
+
+\textbf{GPU and Model Specifications:}
+\begin{itemize}
+    \item GPU: H100 80GB (3350 GB/s bandwidth, 989 TFLOPS compute)
+    \item Model: Qwen3 (30B parameters, requires 15GB per GPU with $\tau=2$)
+\end{itemize}
+
+\subsubsection{Results}
+
+Table \ref{tab:llm_discriminating_results} presents the performance comparison on the discriminating workload.
+
+\begin{table}[htbp]
+\caption{Algorithm performance on discriminating LLM workload (16 H100 GPUs)}
+\label{tab:llm_discriminating_results}
+\centering
+\begin{tabular}{l|ccc}
+\hline
+Algorithm & Weighted Wait & Avg Wait & Completed \\
+\hline
+FIFO & 336.400 & 2.402 & 20 \\
+WeightedFIFO & 108.040 & 1.802 & 20 \\
+SRPT & 108.040 & 1.802 & 20 \\
+WSRPT & 108.040 & 1.802 & 20 \\
+\hline
+\end{tabular}
+\end{table}
+
+\subsubsection{Key Observations}
+
+\textbf{1. Priority-Aware Scheduling Dominance:}
+WeightedFIFO, SRPT, and WSRPT all achieve identical performance on this workload, reducing weighted waiting time by 67.9\% compared to FIFO. This demonstrates that prioritizing high-weight, short-duration tasks is crucial for LLM inference scheduling.
+
+\textbf{2. FIFO Inefficiency:}
+FIFO selects the first 8 tasks by arrival order (all low-weight, long-duration), causing high-weight tasks to wait $\sim$2 seconds. Priority-aware algorithms select high-weight tasks first, completing them quickly before starting low-weight tasks.
+
+\textbf{3. Average Waiting Time:}
+SRPT and WSRPT reduce average waiting time by 25.0\% compared to FIFO (1.802s vs. 2.402s), confirming that shorter tasks should be prioritized to improve system responsiveness.
+
+\textbf{4. Algorithm Equivalence:}
+On this discriminating workload, WeightedFIFO, SRPT, and WSRPT produce identical schedules because the high-weight tasks are also the short-duration tasks, creating alignment between weight-based and duration-based prioritization.
+
+\subsection{Simplified Discrete-Time Simulator}
+
+To enable clear algorithm comparison, we implement a simplified discrete-time simulator with the following design:
+
+\begin{enumerate}
+    \item Time advances in fixed steps ($\Delta t = 0.01$s)
+    \item At each step: (1) Complete finished tasks and free GPUs, (2) Add newly arrived tasks to queue, (3) Scheduler selects next task from queue
+    \item This ensures scheduling decisions occur when \textbf{multiple tasks are waiting}, making algorithm differences visible
+\end{enumerate}
+
+This contrasts with event-driven simulators where tasks are scheduled immediately upon arrival (queue size = 1, no prioritization opportunity). The simplified approach successfully demonstrates the 67.9\% improvement from priority-aware scheduling.
+
 % \appendix
 % \section{Additional Experimental Results}
 
