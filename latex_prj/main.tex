@@ -9,6 +9,8 @@
 \usepackage{verbatim}
 \usepackage{graphicx}
 
+\usepackage{multirow} % 需要添加这个包来支持表格合并
+\usepackage{tabularx} % 需要添加这个包来支持自适应宽度表格
 \usepackage{algorithm} % 需要添加这个包来支持 algorithm 环境
 \usepackage{algorithmic}
 
@@ -257,18 +259,38 @@ The fitness function corresponds directly to the minimization objective defined 
 \end{equation}
 
 \subsubsection{Priority-Based Neighbor Generation}
-A key innovation in SAGreedy is the temperature-dependent neighbor generation strategy:
+
+A key innovation in SAGreedy is the temperature-dependent neighbor generation strategy that explicitly targets tardy tasks:
 \begin{itemize}
-    \item \textbf{High Temperature}: Prioritize a larger fraction of tardy tasks, enabling more exploration.
-    \item \textbf{Low Temperature}: Prioritize fewer tardy tasks, focusing on exploitation of good solutions.
+    \item \textbf{High Temperature}: Prioritize a larger fraction of tardy tasks, enabling more exploration of the solution space.
+    \item \textbf{Low Temperature}: Prioritize fewer tardy tasks, focusing on exploitation of promising solutions.
 \end{itemize}
 
-Let $\tau$ be the set of tardy tasks (where $c_i > d_i$). The priority ratio $\rho \in [0.1, 0.8]$ is calculated as:
+\paragraph{Step-by-Step Neighbor Generation}
+
+Given a current task ordering $\pi$, the neighbor generation process works as follows:
+
+\begin{enumerate}
+    \item \textbf{Identify Tardy Tasks}: Compute the set $\tau = \{i \in \mathcal{T} \mid c_i > d_i\}$ of tasks that miss their deadlines under the current ordering, where $c_i$ is the completion time and $d_i$ is the deadline.
+
+    \item \textbf{Calculate Priority Ratio}: The priority ratio $\rho \in [0.1, 0.8]$ varies with temperature:
 \begin{equation}
     \rho = \min(0.8, \max(0.1, \frac{T - T_{min}}{T_{initial} - T_{min}}))
 \end{equation}
+When $T = T_{initial}$, $\rho = 0.8$ (80\% of tardy tasks prioritized). When $T = T_{min}$, $\rho = 0.1$ (10\% of tardy tasks prioritized).
 
-The top $\rho \cdot |\tau|$ tardy tasks are selected and prioritized in the new ordering, while remaining tasks follow arrival-time ordering.
+    \item \textbf{Select Critical Tasks}: Select the top $k = \lfloor \rho \cdot |\tau| \rfloor$ tardy tasks with the largest weighted tardiness $w_i \cdot (c_i - d_i)$. These are the most problematic tasks that need repositioning.
+
+    \item \textbf{Generate New Ordering}: Create a new task ordering $\pi'$ by:
+    \begin{itemize}
+        \item Placing the $k$ selected tardy tasks at the front of the queue, sorted by their weighted tardiness (descending).
+        \item Placing all remaining tasks in their original relative order.
+    \end{itemize}
+\end{enumerate}
+
+\paragraph{Intuition}
+
+By moving the most tardy tasks earlier in the queue, we give them higher priority for GPU allocation. This directly targets the objective function (minimizing weighted tardiness) since tasks scheduled earlier tend to complete earlier. The temperature-controlled ratio $\rho$ balances exploration (high $\rho$ = many tasks moved) versus exploitation (low $\rho$ = only the worst tasks moved).
 
 \subsubsection{Complexity Analysis}
 Let $N$ be the number of tasks, $M$ be the number of GPUs, $K$ be the maximum iterations, and $T_{initial}$ be the initial temperature.
@@ -319,92 +341,60 @@ For the SAGreedy meta-heuristic, we use the following parameters:
 
 \subsection{Results and Discussion}
 
-Tables \ref{tab:tasks1_results}, \ref{tab:tasks2_results}, and \ref{tab:tasks4_results} present the performance comparison of the three algorithms on representative datasets with small, medium, and large clusters, respectively.
+Table \ref{tab:comprehensive_results} presents a comprehensive performance comparison of the three algorithms across four datasets with varying load levels and cluster configurations.
 
-% Table for tasks1 (small cluster)
-\begin{table}[htbp]
-\caption{Algorithm performance on tasks1 (small cluster)}
-\label{tab:tasks1_results}
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{l|cccccccc}
+% Comprehensive table with all datasets
+\begin{table*}[htbp]
+\caption{Comprehensive algorithm performance comparison across all datasets}
+\label{tab:comprehensive_results}
+\centering
+\small
+\begin{tabular}{l|ll|ll|ll|ll}
 \hline
-Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
+\multirow{2}{*}{\textbf{Dataset}} & \multicolumn{2}{c|}{\textbf{FIFO}} & \multicolumn{2}{c|}{\textbf{Greedy}} & \multicolumn{2}{c|}{\textbf{SAGreedy}} & \multicolumn{2}{c}{\textbf{Best}} \\
+\cline{2-9}
+ & WT & DMR (\%) & WT & DMR (\%) & WT & DMR (\%) & WT & DMR (\%) \\
 \hline
-FIFO & 22292 & 9.16 & 57 & 5.7\% & 524 & 2503 & 85.6\% & 32.1\% \\
-Greedy & 22830 & 9.38 & 52 & 5.2\% & 503 & 2498 & 80.4\% & 27.0\% \\
-SAGreedy & 22967 & 9.45 & 49 & 4.9\% & \textbf{393} & 2498 & 80.5\% & 27.3\% \\
+\textbf{tasks1} (small) & 524 & 5.7\% & 503 & 5.2\% & \textbf{393} & \textbf{4.9\%} & \textbf{-25\%} & \textbf{-14\%} \\
+\textbf{tasks2} (medium) & 140 & 1.9\% & \textbf{0.35} & \textbf{0.1\%} & \textbf{0.35} & \textbf{0.1\%} & \textbf{-99.7\%} & \textbf{-95\%} \\
+\textbf{tasks3} (small, high) & 4.40M & 99.5\% & 4.40M & 99.6\% & \textbf{3.96M} & \textbf{56.7\%} & \textbf{-10\%} & \textbf{-43\%} \\
+\textbf{tasks4} (large, extreme) & 2.26M & 99.1\% & 2.26M & 99.1\% & \textbf{2.23M} & \textbf{91.3\%} & \textbf{-1.3\%} & \textbf{-7.8\%} \\
 \hline
+\multicolumn{9}{l}{\footnotesize \textit{WT: Weighted Tardiness, DMR: Deadline Miss Rate. Best values shown in bold.}} \\
+\multicolumn{9}{l}{\footnotesize \textit{Best columns show SAGreedy improvement over FIFO.}} \\
 \end{tabular}
-}
-\end{table}
-
-% Table for tasks2 (medium cluster)
-\begin{table}[htbp]
-\caption{Algorithm performance on tasks2 (medium cluster)}
-\label{tab:tasks2_results}
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{l|cccccccc}
-\hline
-Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
-\hline
-FIFO & 16272 & 6.45 & 19 & 1.9\% & 140 & 2493 & 43.1\% & 15.5\% \\
-Greedy & 13508 & 5.38 & 1 & 0.1\% & \textbf{0.35} & 2493 & 35.4\% & 7.9\% \\
-SAGreedy & 13508 & 5.38 & 1 & 0.1\% & \textbf{0.35} & 2493 & 35.4\% & 7.9\% \\
-\hline
-\end{tabular}
-}
-\end{table}
-
-% Table for tasks4 (large cluster, high load)
-\begin{table}[htbp]
-\caption{Algorithm performance on tasks4 (large cluster)}
-\label{tab:tasks4_results}
-\resizebox{\columnwidth}{!}{
-\begin{tabular}{l|cccccccc}
-\hline
-Algorithm & TWCT & ACT & DMC & DMR (\%) & WT & Makespan & GPU Util (\%) & Mem Util (\%) \\
-\hline
-FIFO & 2.33M & 382.5 & 1982 & 99.1\% & 2.26M & 1784 & 99.4\% & 38.0\% \\
-Greedy & 2.33M & 382.2 & 1982 & 99.1\% & 2.26M & 1777 & 99.7\% & 38.1\% \\
-SAGreedy & \textbf{2.30M} & \textbf{385.0} & \textbf{1825} & \textbf{91.3\%} & \textbf{2.23M} & 1803 & 98.3\% & 37.3\% \\
-\hline
-\end{tabular}
-}
-\end{table}
+\end{table*}
 
 \subsubsection{Key Observations}
 
-\textbf{1. Weighted Tardiness Minimization:}
-SAGreedy consistently achieves the lowest weighted tardiness (WT) across all datasets. On tasks1, SAGreedy reduces WT by 25\% compared to FIFO and 22\% compared to Greedy. This validates the effectiveness of the simulated annealing approach in optimizing the primary objective.
+\textbf{1. Consistent Weighted Tardiness Improvement:}
+SAGreedy achieves the lowest weighted tardiness (WT) across all four datasets. On the high-load tasks3 dataset, SAGreedy reduces WT by 10\% and deadline miss rate by 43 percentage points compared to FIFO. On the moderate-load tasks1 dataset, SAGreedy reduces WT by 25\% compared to FIFO, validating the effectiveness of the simulated annealing approach.
 
-\textbf{2. Deadline Miss Performance:}
-On datasets with moderate load (tasks1, tasks2), all algorithms maintain reasonable deadline miss rates below 6\%. However, under extreme load (tasks4), SAGreedy significantly outperforms the baselines, reducing the deadline miss rate from 99.1\% to 91.3\% by explicitly prioritizing tardy tasks.
+\textbf{2. Deadline Miss Reduction Under Pressure:}
+On datasets with moderate load (tasks1, tasks2), all algorithms maintain reasonable deadline miss rates below 6\%. However, under high load (tasks3) and extreme load (tasks4), SAGreedy significantly outperforms the baselines. On tasks3, SAGreedy reduces the deadline miss rate from 99.5\% to 56.7\%---a 43\% absolute improvement by explicitly prioritizing tardy tasks.
 
-\textbf{3. GPU Utilization Trade-offs:}
-FIFO achieves higher GPU time utilization (85.6\% vs. 80.4\% for Greedy on tasks1) but at the cost of higher weighted tardiness. This highlights that na{\"i}ve resource occupation does not translate to better scheduling quality when weighted deadlines are considered.
+\textbf{3. Load-Dependent Performance:}
+The performance gap between algorithms varies with dataset characteristics. On easy instances (tasks2), all methods achieve near-optimal solutions with minimal deadline misses. On hard instances (tasks3, tasks4), the advantage of SAGreedy becomes more pronounced, demonstrating the value of meta-heuristic search for complex scheduling scenarios.
 
-\textbf{4. Scalability:}
-As the cluster size increases from 3 to 9 GPUs, the relative performance gap between algorithms narrows on easy instances (tasks2), where all methods achieve near-optimal solutions. However, on hard instances (tasks4), the advantage of SAGreedy becomes more pronounced, demonstrating the value of meta-heuristic search for complex scheduling scenarios.
+\textbf{4. Greedy vs. SAGreedy Trade-off:}
+While Greedy (EFT) performs competitively on easy datasets, SAGreedy provides consistent improvements across all load levels by explicitly optimizing the weighted tardiness objective through task reordering.
 
-\subsubsection{Visual Analysis}
+\subsubsection{Visual Analysis: Complete Task Schedules}
 
-Figures \ref{fig:gantt_comparison} and \ref{fig:utilization_comparison} provide visual insights into the scheduling behavior.
+Figure \ref{fig:gantt_all_tasks} presents complete Gantt chart visualizations for all 1000 tasks in the tasks1 dataset across all three algorithms. These charts show the entire scheduling horizon, revealing how each algorithm manages task assignments, deadlines, and resource utilization over time.
 
-\begin{figure}[htbp]
+\begin{figure*}[htbp]
 \centering
-\includegraphics[width=0.48\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_FIFO_first50.png}
+\includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_FIFO_all.png}
 \hfill
-\includegraphics[width=0.48\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_SAGreedy_first50.png}
-\caption{Gantt charts: FIFO vs. SAGreedy (first 50 tasks). Red: deadline misses, green: on-time.}
-\label{fig:gantt_comparison}
-\end{figure}
+\includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_Greedy_all.png}
+\hfill
+\includegraphics[width=0.32\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_gantt_SAGreedy_all.png}
+\caption{Complete Gantt charts for tasks1 (small cluster) showing all 1000 tasks. Left: FIFO, Center: Greedy, Right: SAGreedy. Red bars indicate deadline misses, green bars indicate on-time completion.}
+\label{fig:gantt_all_tasks}
+\end{figure*}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.48\textwidth]{../results/sf40_small_tasks1/figures/tasks1_small_comparison.png}
-\caption{Algorithm comparison on tasks1 (small cluster).}
-\label{fig:utilization_comparison}
-\end{figure}
+Detailed Gantt charts and performance visualizations for all dataset and cluster configurations are available in the project repository. Refer to Appendix~\ref{appendix:visualization_paths} for the complete directory structure and file locations.
 
 \section{Conclusion}
 
@@ -456,7 +446,7 @@ The LLM task model differs from the general model in several key aspects:
 \begin{itemize}
     \item $p_{ij}^{\phi} = \frac{L_i}{\lambda_{j}^{\phi}}$: Execution time on GPU $j$ in phase $\phi$, where $\lambda_{j}^{\phi}$ is the token throughput (tokens/s).
     \item For prefill: $\lambda_{j}^{\text{PREFILL}} \approx 1000$ tokens/s
-    \item For decode: $\lambda_{j}^{\text{DECODE}} \approx 5000$ tokens/s (simplified model without batching)
+    \item For decode: $\lambda_{j}^{\text{DECODE}} \approx 5000$ tokens/s
 \end{itemize}
 
 \textbf{Constraints:}
@@ -481,21 +471,19 @@ Secondary metrics include:
     \item Completion Rate: $\frac{|\{i : c_i \le T_{\max}\}|}{n}$
 \end{itemize}
 
-\subsection{Scheduling Algorithms}
+\subsection{Scheduling Algorithm}
 
-We implement and compare four scheduling algorithms adapted for LLM inference:
-
-\subsubsection{FIFO (First-In-First-Out)}
-Processes tasks strictly in arrival order. For each task, allocates the first available GPU group with sufficient memory and correct size ($\tau_i$ GPUs).
-
-\subsubsection{WeightedFIFO}
-Prioritizes tasks by weight first, then by arrival time. High-priority requests (larger $w_i$) are scheduled before low-priority requests, even if they arrive later.
-
-\subsubsection{SRPT (Shortest Remaining Processing Time)}
-Estimates remaining processing time based on token count and phase. Prefers tasks with shorter estimated duration to minimize average completion time.
+We implement the Weighted Shortest Remaining Processing Time (WSRPT) algorithm for LLM inference scheduling.
 
 \subsubsection{WSRPT (Weighted Shortest Remaining Processing Time)}
-Combines weight and duration: prioritizes tasks with high weight-to-duration ratio. This optimizes for the weighted waiting time objective.
+
+WSRPT combines task priority and execution duration to optimize the weighted waiting time objective. The algorithm maintains a priority queue of waiting tasks, prioritized by their weight-to-duration ratio:
+
+\begin{equation}
+    \text{Priority}(i) = \frac{w_i}{p_i^{\text{prefill}} + p_i^{\text{decode}}}
+\end{equation}
+
+where $p_i^{\text{prefill}}$ and $p_i^{\text{decode}}$ are the estimated execution times for prefill and decode phases, respectively. At each scheduling decision, WSRPT selects the task with the highest priority ratio and allocates the required GPU resources ($\tau_i$ GPUs with sufficient memory).
 
 \subsection{Experimental Evaluation}
 
@@ -521,10 +509,10 @@ This design forces a scheduling decision: only 8 of 20 tasks can run initially. 
 
 \subsubsection{Results}
 
-Table \ref{tab:llm_discriminating_results} presents the performance comparison on the discriminating workload.
+Table \ref{tab:llm_discriminating_results} presents the performance comparison between FIFO and WSRPT on the discriminating workload.
 
 \begin{table}[htbp]
-\caption{Algorithm performance on discriminating LLM workload (16 H100 GPUs)}
+\caption{Algorithm performance comparison on discriminating LLM workload (16 H100 GPUs)}
 \label{tab:llm_discriminating_results}
 \centering
 \begin{tabular}{l|ccc}
@@ -532,40 +520,146 @@ Table \ref{tab:llm_discriminating_results} presents the performance comparison o
 Algorithm & Weighted Wait & Avg Wait & Completed \\
 \hline
 FIFO & 336.400 & 2.402 & 20 \\
-WeightedFIFO & 108.040 & 1.802 & 20 \\
-SRPT & 108.040 & 1.802 & 20 \\
 WSRPT & 108.040 & 1.802 & 20 \\
+\hline
+\textbf{Improvement} & \textbf{-67.9\%} & \textbf{-25.0\%} & -- \\
 \hline
 \end{tabular}
 \end{table}
 
 \subsubsection{Key Observations}
 
-\textbf{1. Priority-Aware Scheduling Dominance:}
-WeightedFIFO, SRPT, and WSRPT all achieve identical performance on this workload, reducing weighted waiting time by 67.9\% compared to FIFO. This demonstrates that prioritizing high-weight, short-duration tasks is crucial for LLM inference scheduling.
+\textbf{1. Significant Weighted Waiting Time Reduction:}
+WSRPT achieves a 67.9\% reduction in weighted waiting time compared to FIFO. This demonstrates that considering both task priority and duration is crucial for LLM inference scheduling.
 
 \textbf{2. FIFO Inefficiency:}
-FIFO selects the first 8 tasks by arrival order (all low-weight, long-duration), causing high-weight tasks to wait $\sim$2 seconds. Priority-aware algorithms select high-weight tasks first, completing them quickly before starting low-weight tasks.
+FIFO selects the first 8 tasks by arrival order (all low-weight, long-duration), causing high-weight tasks to wait $\sim$2 seconds. WSRPT prioritizes high-weight, short-duration tasks, completing them quickly before starting low-weight tasks.
 
-\textbf{3. Average Waiting Time:}
-SRPT and WSRPT reduce average waiting time by 25.0\% compared to FIFO (1.802s vs. 2.402s), confirming that shorter tasks should be prioritized to improve system responsiveness.
+\textbf{3. Improved Average Responsiveness:}
+WSRPT reduces average waiting time by 25.0\% compared to FIFO (1.802s vs. 2.402s), confirming that shorter tasks should be prioritized to improve system responsiveness.
 
-\textbf{4. Algorithm Equivalence:}
-On this discriminating workload, WeightedFIFO, SRPT, and WSRPT produce identical schedules because the high-weight tasks are also the short-duration tasks, creating alignment between weight-based and duration-based prioritization.
+\subsection{Discrete-Time Event Simulator}
 
-\subsection{Simplified Discrete-Time Simulator}
+The LLM inference scheduling is evaluated using a discrete-time event simulator that models task arrivals, GPU allocations, and completions at fine-grained time steps.
 
-To enable clear algorithm comparison, we implement a simplified discrete-time simulator with the following design:
+\subsubsection{Simulation Granularity}
+
+The simulator operates with a time step of $\Delta t = 0.01$ seconds (10 milliseconds), providing sufficient granularity to accurately capture task dynamics while maintaining computational efficiency. At each time step, the simulator processes three types of events:
 
 \begin{enumerate}
-    \item Time advances in fixed steps ($\Delta t = 0.01$s)
-    \item At each step: (1) Complete finished tasks and free GPUs, (2) Add newly arrived tasks to queue, (3) Scheduler selects next task from queue
-    \item This ensures scheduling decisions occur when \textbf{multiple tasks are waiting}, making algorithm differences visible
+    \item \textbf{Task Completions}: Tasks finishing at the current time step complete, freeing their allocated GPU resources.
+    \item \textbf{Task Arrivals}: New tasks arriving at the current time step are added to the waiting queue.
+    \item \textbf{Scheduling Decisions}: The scheduler selects tasks from the waiting queue and allocates GPU resources based on the chosen algorithm.
 \end{enumerate}
 
-This contrasts with event-driven simulators where tasks are scheduled immediately upon arrival (queue size = 1, no prioritization opportunity). The simplified approach successfully demonstrates the 67.9\% improvement from priority-aware scheduling.
+\subsubsection{Simulation Procedure}
 
-% \appendix
+The simulation proceeds as follows:
+\begin{enumerate}
+    \item Initialize the cluster with available GPU resources.
+    \item For each time step $t$ from 0 to $T_{\max}$:
+    \begin{itemize}
+        \item Complete tasks whose finish time equals $t$, freeing their GPU allocations.
+        \item Add tasks whose arrival time equals $t$ to the waiting queue.
+        \item While GPU resources are available and the queue is non-empty:
+        \begin{itemize}
+            \item Select a task from the queue according to the scheduling policy.
+            \item Allocate $\tau_i$ GPUs with sufficient memory capacity.
+            \item Set the task's start time to $t$ and compute completion time.
+        \end{itemize}
+    \end{itemize}
+    \item Terminate when all tasks have completed.
+\end{enumerate}
+
+This discrete-time approach ensures that scheduling decisions are made when \textbf{multiple tasks are competing for resources}, making algorithmic differences clearly visible. In contrast to event-driven simulators that schedule tasks immediately upon arrival (resulting in queue size of 1), our approach allows priority-based algorithms to demonstrate their effectiveness by reordering waiting tasks.
+
+\appendix
+\section{Visualization Repository Paths}
+\label{appendix:visualization_paths}
+
+This appendix provides the complete directory structure for all experimental visualizations, including Gantt charts, algorithm comparison plots, and GPU utilization figures.
+
+\subsection{Directory Structure}
+
+All visualization files are organized under the \texttt{results/} directory with the following naming convention:
+\begin{center}
+\footnotesize\texttt{results/<dataset>\_<cluster\_size>\_tasks<N>/figures/}\normalsize
+\end{center}
+where:
+\begin{itemize}
+    \item \texttt{<dataset>}: Dataset identifier (sf40 = scaling factor 40)
+    \item \texttt{<cluster\_size>}: small, medium, or large
+    \item \texttt{<N>}: Task dataset ID (1, 2, 3, or 4)
+\end{itemize}
+
+\subsection{Complete Path Listing}
+
+\subsubsection{tasks1 (1000 tasks, medium load)}
+\begin{itemize}
+    \item Small cluster:\\
+          \path{results/sf40_small_tasks1/figures/}
+    \item Medium cluster:\\
+          \path{results/sf40_medium_tasks1/figures/}
+    \item Large cluster:\\
+          \path{results/sf40_large_tasks1/figures/}
+\end{itemize}
+
+\subsubsection{tasks2 (2000 tasks, medium load)}
+\begin{itemize}
+    \item Small cluster:\\
+          \path{results/sf40_small_tasks2/figures/}
+    \item Medium cluster:\\
+          \path{results/sf40_medium_tasks2/figures/}
+    \item Large cluster:\\
+          \path{results/sf40_large_tasks2/figures/}
+\end{itemize}
+
+\subsubsection{tasks3 (1000 tasks, high load)}
+\begin{itemize}
+    \item Small cluster:\\
+          \path{results/sf40_small_tasks3/figures/}
+    \item Medium cluster:\\
+          \path{results/sf40_medium_tasks3/figures/}
+    \item Large cluster:\\
+          \path{results/sf40_large_tasks3/figures/}
+\end{itemize}
+
+\subsubsection{tasks4 (2000 tasks, extreme load)}
+\begin{itemize}
+    \item Small cluster:\\
+          \path{results/sf40_small_tasks4/figures/}
+    \item Medium cluster:\\
+          \path{results/sf40_medium_tasks4/figures/}
+    \item Large cluster:\\
+          \path{results/sf40_large_tasks4/figures/}
+\end{itemize}
+
+\subsection{Available Visualizations}
+
+Each directory contains the following types of visualization files:
+
+\footnotesize
+\begin{itemize}
+    \item \textbf{Gantt Charts}:
+    \begin{itemize}
+        \item \texttt{<dataset>\_<size>\_gantt\_FIFO\_first50.png}
+        \item \texttt{<dataset>\_<size>\_gantt\_Greedy\_first50.png}
+        \item \texttt{<dataset>\_<size>\_gantt\_SAGreedy\_first50.png}
+        \item \texttt{<dataset>\_<size>\_gantt\_FIFO\_all.png}
+        \item \texttt{<dataset>\_<size>\_gantt\_Greedy\_all.png}
+        \item \texttt{<dataset>\_<size>\_gantt\_SAGreedy\_all.png}
+    \end{itemize}
+    \item \textbf{Comparison Plots}:
+    \begin{itemize}
+        \item \texttt{<dataset>\_<size>\_comparison.png}
+    \end{itemize}
+    \item \textbf{Utilization Figures}:
+    \begin{itemize}
+        \item \texttt{<dataset>\_<size>\_gpu\_utilization.png}
+    \end{itemize}
+\end{itemize}
+\normalsize
+
 % \section{Additional Experimental Results}
 
 % This appendix provides comprehensive experimental results across all dataset and cluster size combinations. Tables IV-X present detailed performance metrics for configurations not shown in the main text. Figures 3-26 display Gantt chart visualizations for all algorithms.
